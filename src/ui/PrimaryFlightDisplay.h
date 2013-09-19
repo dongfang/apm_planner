@@ -26,7 +26,9 @@ public slots:
     void updateNavigationControllerErrors(UASInterface* uas, double altitudeError, double speedError, double xtrackError);
 
     /** @brief Set the currently monitored UAS */
-    virtual void setActiveUAS(UASInterface* uas);
+    void addUAS(UASInterface* uas);
+    //void forgetUAS(UASInterface* uas);
+    void setActiveUAS(UASInterface* uas);
 
 protected:
     enum Layout {
@@ -144,9 +146,9 @@ private:
     float navigationTargetBearing;
 
     Layout layout;      // The display layout.
-    Style style;        // The AI style (tapes translusent or opague)
+    Style style;        // The AI style (tapes translucent or opague)
 
-
+    // TODO: Use stylesheet colors?
     QColor redColor;
     QColor amberColor;
     QColor greenColor;
@@ -154,7 +156,7 @@ private:
     qreal lineWidth;
     qreal fineLineWidth;
 
-    qreal smallTestSize;
+    qreal smallTextSize;
     qreal mediumTextSize;
     qreal largeTextSize;
 
@@ -170,13 +172,7 @@ private:
     static const int tickValues[];
     static const QString compassWindNames[];
 
-    static const int updateInterval = 40;
-
-
-signals:
-    
-public slots:
-    
+    static const int updateInterval = 40;   
 };
 
 #endif // PRIMARYFLIGHTDISPLAY_H
