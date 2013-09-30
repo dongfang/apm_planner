@@ -13,8 +13,8 @@
 //#include <cmath>
 
 static const float SEPARATE_COMPASS_ASPECTRATIO = 3.0f/4.0f;
-static const float LINEWIDTH = 0.0036f;
-static const float SMALL_TEXT_SIZE = 0.028f;
+static const float LINEWIDTH = 0.0033f;
+static const float SMALL_TEXT_SIZE = 0.025f;
 static const float MEDIUM_TEXT_SIZE = SMALL_TEXT_SIZE*1.2f;
 static const float LARGE_TEXT_SIZE = MEDIUM_TEXT_SIZE*1.2f;
 
@@ -186,7 +186,6 @@ PrimaryFlightDisplay::~PrimaryFlightDisplay()
 {
     refreshTimer->stop();
 }
-
 
 QSize PrimaryFlightDisplay::sizeHint() const
 {
@@ -1268,8 +1267,11 @@ void PrimaryFlightDisplay::doPaint() {
     painter.fillRect(rect(), Qt::black);
     qreal tapeGaugeWidth;
 
-    qreal compassHalfSpan = 180;
+    qreal compassHalfSpan = 100;
     float compassAIIntrusion = 0;
+
+    float w = width(); // 200;
+    float h = height(); // 150;
 
     switch(layout) {
     /*
@@ -1357,9 +1359,9 @@ void PrimaryFlightDisplay::doPaint() {
     */
 
     case COMPASS_INTEGRATED: {
-        tapeGaugeWidth = tapesGaugeWidthFor(width(), width());
-        qreal aiheight = height();
-        qreal aiwidth = width()-tapeGaugeWidth*2;
+        tapeGaugeWidth = tapesGaugeWidthFor(w, w);
+        qreal aiheight = h;
+        qreal aiwidth = w-tapeGaugeWidth*2;
         if (aiheight > aiwidth) aiheight = aiwidth;
 
         AIMainArea = QRectF(
@@ -1371,8 +1373,8 @@ void PrimaryFlightDisplay::doPaint() {
         AIPaintArea = QRectF(
                     0,
                     0,
-                    width(),
-                    height());
+                    w,
+                    h);
 
         // Tape gauges get so much width that the AI area not covered by them is perfectly square.
         velocityMeterArea = QRectF (0, 0, tapeGaugeWidth, aiheight);
@@ -1394,8 +1396,8 @@ void PrimaryFlightDisplay::doPaint() {
         //if (heightSurplus >= 0) compassCenterY =  AIMainArea.bottom() + compassSize/2;
         compassCenterY = AIMainArea.bottom() + compassSize / 4;
 
-        if (height() - compassCenterY > AIMainArea.width()/2*compassBottomMargin)
-            compassCenterY = height()-AIMainArea.width()/2*compassBottomMargin;
+        if (h - compassCenterY > AIMainArea.width()/2*compassBottomMargin)
+            compassCenterY = h-AIMainArea.width()/2*compassBottomMargin;
 
         // TODO: This is bad style...
         compassCenterY = (compassCenterY * 2 + AIMainArea.bottom() + compassSize / 4) / 3;
@@ -1405,8 +1407,8 @@ void PrimaryFlightDisplay::doPaint() {
                              compassSize,
                              compassSize);
 
-        if (height()-compassCenterY < compassSize/2) {
-            compassHalfSpan = acos((compassCenterY-height())*2/compassSize) * 180/M_PI + COMPASS_DISK_RESOLUTION;
+        if (h-compassCenterY < compassSize/2) {
+            compassHalfSpan = acos((compassCenterY-h)*2/compassSize) * 180/M_PI + COMPASS_DISK_RESOLUTION;
             if (compassHalfSpan > 180) compassHalfSpan = 180;
         }
 
@@ -1417,23 +1419,23 @@ void PrimaryFlightDisplay::doPaint() {
     }
     case COMPASS_SEPARATED: {
         // A layout for containers higher than their width.
-        tapeGaugeWidth = tapesGaugeWidthFor(width(), width());
+        tapeGaugeWidth = tapesGaugeWidthFor(w, w);
 
-        qreal aiheight = width() - tapeGaugeWidth*2;
+        qreal aiheight = w - tapeGaugeWidth*2;
         qreal panelsHeight = 0;
 
         AIMainArea = QRectF(
                     tapeGaugeWidth,
                     0,
-                    width()-tapeGaugeWidth*2,
+                    w-tapeGaugeWidth*2,
                     aiheight);
 
         AIPaintArea = style == OVERLAY_HSI ?
                     QRectF(
                     0,
                     0,
-                    width(),
-                    height() - panelsHeight) : AIMainArea;
+                    w,
+                    h - panelsHeight) : AIMainArea;
 
         velocityMeterArea = QRectF (0, 0, tapeGaugeWidth, aiheight);
         altimeterArea = QRectF(AIMainArea.right(), 0, tapeGaugeWidth, aiheight);
@@ -1482,8 +1484,8 @@ void PrimaryFlightDisplay::doPaint() {
         missionStatsArea =QRectF(panelsWidth*3, height()-panelsHeight, panelsWidth, panelsHeight);
         */
 
-        QPoint compassCenter = QPoint(width()/2, AIMainArea.bottom()+width()/2);
-        qreal compassDiam = width() * 0.8;
+        QPoint compassCenter = QPoint(w/2, AIMainArea.bottom()+w/2);
+        qreal compassDiam = w * 0.8;
         compassArea = QRectF(compassCenter.x()-compassDiam/2, compassCenter.y()-compassDiam/2, compassDiam, compassDiam);
         break;
     }
