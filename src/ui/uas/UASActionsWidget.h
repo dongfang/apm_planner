@@ -15,6 +15,8 @@ public:
 
 private slots:
     void activeUASSet(UASInterface *uas);
+    void uasConnected();
+    void uasDisconnected();
 
     void armButtonClicked();
     void armingChanged(bool state);
@@ -24,10 +26,12 @@ private slots:
     void changeAltitudeClicked();
     void changeSpeedClicked();
     void setMode();   //[TODO] create a new ardupilot mode types
+    void setShortcutMode();
     void setAction();
-    void setAutoMode();
     void setRTLMode();
-    void setManualMode();
+
+    void parameterChanged(int uas, int component, int parameterCount,
+                          int parameterId, QString parameterName, QVariant value);
 
 private:
     void setupApmCopterModes();
@@ -39,6 +43,8 @@ private:
     void sendApmRoverCommand(MAV_CMD command);
 
     bool activeUas();
+
+    int preFlightWarningBox();
 
 private:
     Ui::UASActionsWidget ui;

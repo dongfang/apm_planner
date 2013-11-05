@@ -43,6 +43,9 @@ greaterThan(QT_MAJOR_VERSION, 4) {
 
 TEMPLATE = app
 TARGET = apmplanner2
+
+QMAKE_INFO_PLIST = APMPlanner.plist   # Sets the pretty name for the build
+
 BASEDIR = $${IN_PWD}
 linux-g++|linux-g++-64{
     debug {
@@ -88,6 +91,8 @@ win32-x-g++|win64-x-g++ {
 unix {
         DEFINES += GIT_COMMIT=$$system(git describe --dirty=-DEV --always)
         DEFINES += GIT_HASH=$$system(git log -n 1 --pretty=format:%H)
+	INCLUDEPATH += C:/openssl-1.0.1e/include
+	LIBS += -lssl -lcrypto
 }
 include (QsLog/QsLog.pri)
 
@@ -118,6 +123,7 @@ HEADERS +=     libs/alglib/src/ap.h \
     libs/alglib/src/integration.h \
     libs/alglib/src/solvers.h \
     libs/alglib/src/specialfunctions.cpp \
+    src/ui/configuration/Radio3DRSettings.h \
     src/ui/configuration/SetupWarningMessage.h
 
 SOURCES +=     libs/alglib/src/ap.cpp \
@@ -130,6 +136,7 @@ SOURCES +=     libs/alglib/src/ap.cpp \
     libs/alglib/src/integration.cpp \
     libs/alglib/src/solvers.cpp \
     libs/alglib/src/specialfunctions.cpp \
+    src/ui/configuration/Radio3DRSettings.cc \
     src/ui/configuration/SetupWarningMessage.cc
 
 # EIGEN matrix library (header-only)
@@ -867,8 +874,6 @@ win32-msvc2008|win32-msvc2010|win32-msvc2012 {
 unix:!macx:!symbian: LIBS += -losg
 
 OTHER_FILES += \
-    dongfang_notes.txt \
-    src/ui/dongfang-scrapyard.txt \
     qml/components/DigitalDisplay.qml \
     qml/components/StatusDisplay.qml \
     qml/components/ModeDisplay.qml \

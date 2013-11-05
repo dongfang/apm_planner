@@ -19,7 +19,8 @@ protected:
     void run();
 private:
     bool m_stop;
-    QSerialPort *port;
+    QSerialPort *m_port;
+    QByteArray m_serialBuffer;
     int get_sync(int timeout=1000);
     bool reqInfo(unsigned char infobyte,unsigned int *reply);
     int readBytes(int num,int timeout,QByteArray &buf);
@@ -27,8 +28,10 @@ private:
     unsigned int m_loadedFwSize;
     QString m_loadedDescription;
     QTemporaryFile *tempFile;
+    QTemporaryFile *tempJsonFile;
 signals:
     void requestDevicePlug();
+    void devicePlugDetected();
     void done();
     void serialNumber(QString sn);
     void OTP(QString otp);
@@ -39,6 +42,7 @@ signals:
     void flashProgress(qint64 current,qint64 total);
     void error(QString error);
     void statusUpdate(QString status);
+    void debugUpdate(QString debug);
 public slots:
 
 };

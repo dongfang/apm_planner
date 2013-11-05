@@ -22,8 +22,10 @@ This file is part of the APM_PLANNER project
 
 #include "BatteryMonitorConfig.h"
 #include <QMessageBox>
+#include "QsLog.h"
 
-BatteryMonitorConfig::BatteryMonitorConfig(QWidget *parent) : AP2ConfigWidget(parent)
+BatteryMonitorConfig::BatteryMonitorConfig(QWidget *parent) : AP2ConfigWidget(parent),
+    m_maxVoltOut(3.3)
 {
     ui.setupUi(this);
     ui.monitorComboBox->addItem(tr("0: Disabled"),0);
@@ -41,7 +43,8 @@ BatteryMonitorConfig::BatteryMonitorConfig(QWidget *parent) : AP2ConfigWidget(pa
     ui.apmVerComboBox->addItem(tr("1: APM2 - 2.5 non 3DR"));
     ui.apmVerComboBox->addItem(tr("2: APM2.5 - 3DR Power Module"));
     ui.apmVerComboBox->addItem(tr("3: PX4"));
-    ui.apmVerComboBox->addItem(tr("4: Pixhawk"));
+    ui.apmVerComboBox->addItem(tr("4: Pixhawk - 3DR 4in1 ESC"));
+    ui.apmVerComboBox->addItem(tr("5: Pixhawk - 3DR Power Module"));
 
     ui.alertOnLowCheckBox->setVisible(false); //Unimpelemented, but TODO.
 
@@ -54,6 +57,7 @@ BatteryMonitorConfig::BatteryMonitorConfig(QWidget *parent) : AP2ConfigWidget(pa
     connect(ui.measuredVoltsLineEdit,SIGNAL(editingFinished()),this,SLOT(measuredVoltsSet()));
     connect(ui.ampsPerVoltsLineEdit,SIGNAL(editingFinished()),this,SLOT(ampsPerVoltSet()));
     connect(ui.battCapacityLineEdit,SIGNAL(editingFinished()),this,SLOT(batteryCapacitySet()));
+    connect(ui.measuredCurrentLineEdit,SIGNAL(editingFinished()),this,SLOT(measuredCurrentSet()));
 
 
     initConnections();
@@ -77,8 +81,30 @@ void BatteryMonitorConfig::measuredVoltsSet()
     float newval = (measured * divider)/ calced;
     disconnect(ui.calcDividerLineEdit,SIGNAL(editingFinished()),this,SLOT(calcDividerSet()));
     ui.calcDividerLineEdit->setText(QString::number(newval,'f',6));
-    m_uas->getParamManager()->setParameter(1,"VOLT_DIVIDER",newval);
+    m_uas->getParamManager()->setParameter(1,m_voltDividerParam,newval);
     connect(ui.calcDividerLineEdit,SIGNAL(editingFinished()),this,SLOT(calcDividerSet()));
+}
+
+void BatteryMonitorConfig::measuredCurrentSet()
+{
+    if (!m_uas)
+    {
+        showNullMAVErrorMessageBox();
+        return;
+    }
+    bool ok = false;
+    float measured = ui.measuredCurrentLineEdit->text().toFloat(&ok);
+    QLOG_DEBUG() << "Measured Current: " << measured;
+    if (!ok)
+    {
+        QMessageBox::information(0,"Error","Invalid number entered for measured current. Please try again");
+        return;
+    }
+    float calced = ui.batteryCurrentLineEdit->text().toFloat(&ok);
+    float divider = ui.ampsPerVoltsLineEdit->text().toFloat(&ok);
+    float newval = (measured * divider)/ calced;
+    ui.ampsPerVoltsLineEdit->setText(QString::number(newval,'f',6));
+    m_uas->getParamManager()->setParameter(1,m_ampPerVoltParam,newval);
 }
 
 void BatteryMonitorConfig::activeUASSet(UASInterface *uas)
@@ -115,7 +141,7 @@ void BatteryMonitorConfig::calcDividerSet()
         QMessageBox::information(0,"Error","Invalid number entered for voltage divider. Please try again");
         return;
     }
-    m_uas->getParamManager()->setParameter(1,"VOLT_DIVIDER",newval);
+    m_uas->getParamManager()->setParameter(1,m_voltDividerParam,newval);
 }
 void BatteryMonitorConfig::ampsPerVoltSet()
 {
@@ -132,7 +158,7 @@ void BatteryMonitorConfig::ampsPerVoltSet()
         QMessageBox::information(0,"Error","Invalid number entered for amps per volts. Please try again");
         return;
     }
-    m_uas->getParamManager()->setParameter(1,"AMPS_PER_VOLT",newval);
+    m_uas->getParamManager()->setParameter(1,m_ampPerVoltParam,newval);
 }
 void BatteryMonitorConfig::batteryCapacitySet()
 {
@@ -161,6 +187,7 @@ void BatteryMonitorConfig::monitorCurrentIndexChanged(int index)
     }
     if (index == 0) //Battery Monitor Disabled
     {
+        QLOG_DEBUG() << "Battery Monitor Disabled";
         m_uas->getParamManager()->setParameter(1,"BATT_VOLT_PIN",-1);
         m_uas->getParamManager()->setParameter(1,"BATT_CURR_PIN",-1);
         m_uas->getParamManager()->setParameter(1,"BATT_MONITOR",0);
@@ -174,7 +201,9 @@ void BatteryMonitorConfig::monitorCurrentIndexChanged(int index)
     }
     else if (index == 1) //Monitor voltage only
     {
+        QLOG_DEBUG() << "Monitor Voltage only";
         m_uas->getParamManager()->setParameter(1,"BATT_MONITOR",3);
+        m_uas->getParamManager()->setParameter(1,"BATT_CURR_PIN",-1);
         ui.sensorComboBox->setEnabled(false);
         ui.apmVerComboBox->setEnabled(true);
         ui.measuredVoltsLineEdit->setEnabled(true);
@@ -185,6 +214,7 @@ void BatteryMonitorConfig::monitorCurrentIndexChanged(int index)
     }
     else if (index == 2) //Monitor voltage and current
     {
+        QLOG_DEBUG() << "Monitor Voltage & Current";
         m_uas->getParamManager()->setParameter(1,"BATT_MONITOR",4);
         ui.sensorComboBox->setEnabled(true);
         ui.apmVerComboBox->setEnabled(true);
@@ -199,6 +229,8 @@ void BatteryMonitorConfig::monitorCurrentIndexChanged(int index)
 }
 void BatteryMonitorConfig::sensorCurrentIndexChanged(int index)
 {
+    QLOG_DEBUG() << "sensorCurrentIndexChanged" << index;
+    m_maxVoltOut = 3.3;
     float maxvolt = 0.0;
     float maxamps = 0.0;
     float mvpervolt = 0.0;
@@ -229,6 +261,7 @@ void BatteryMonitorConfig::sensorCurrentIndexChanged(int index)
         //3dr
         maxvolt = 50.0;
         maxamps = 90.0;
+        m_maxVoltOut = 5.0;
     }
     else if (index == 5)
     {
@@ -236,8 +269,8 @@ void BatteryMonitorConfig::sensorCurrentIndexChanged(int index)
         maxvolt = 39.67;
         maxamps = 56.1;
     }
-    mvpervolt = calculatemVPerVolt(3.3,maxvolt);
-    mvperamp = calculatemVPerAmp(3.3,maxamps);
+    mvpervolt = calculatemVPerVolt(m_maxVoltOut,maxvolt);
+    mvperamp = calculatemVPerAmp(m_maxVoltOut,maxamps);
     if (index == 0)
     {
         //Other
@@ -251,8 +284,8 @@ void BatteryMonitorConfig::sensorCurrentIndexChanged(int index)
         topamps = (maxamps * mvperamp) / 1000.0;
         ui.calcDividerLineEdit->setText(QString::number(maxvolt/topvolt));
         ui.ampsPerVoltsLineEdit->setText(QString::number(maxamps / topamps));
-        m_uas->getParamManager()->setParameter(1,"AMP_PER_VOLT",(float)(maxamps/topamps));
-        m_uas->getParamManager()->setParameter(1,"VOLT_DIVIDER",(float)(maxvolt/topvolt));
+        m_uas->getParamManager()->setParameter(1,m_ampPerVoltParam,(float)(maxamps/topamps));
+        m_uas->getParamManager()->setParameter(1,m_voltDividerParam,(float)(maxvolt/topvolt));
         ui.ampsPerVoltsLineEdit->setEnabled(false);
         ui.calcDividerLineEdit->setEnabled(false);
         ui.measuredVoltsLineEdit->setEnabled(false);
@@ -261,11 +294,13 @@ void BatteryMonitorConfig::sensorCurrentIndexChanged(int index)
 }
 float BatteryMonitorConfig::calculatemVPerAmp(float maxvoltsout,float maxamps)
 {
+    QLOG_DEBUG() << "calculatemVPerAmp: maxvoltsout" << maxvoltsout << "maxamps:" << maxamps;
     return (1000.0 * (maxvoltsout/maxamps));
 }
 
 float BatteryMonitorConfig::calculatemVPerVolt(float maxvoltsout,float maxvolts)
 {
+    QLOG_DEBUG() << "calculatemVPerVolt: maxvoltsout" << maxvoltsout << "maxvolts:" << maxvolts;
     return (1000.0 * (maxvoltsout/maxvolts));
 }
 
@@ -278,40 +313,59 @@ void BatteryMonitorConfig::apmVerCurrentIndexChanged(int index)
     }
     if (index == 0) //APM1
     {
+        QLOG_DEBUG() << "APM1 settings";
         m_uas->getParamManager()->setParameter(1,"BATT_VOLT_PIN",0);
         m_uas->getParamManager()->setParameter(1,"BATT_CURR_PIN",1);
     }
     else if (index == 1) //APM2
     {
+        QLOG_DEBUG() << "APM2 settings";
         m_uas->getParamManager()->setParameter(1,"BATT_VOLT_PIN",1);
         m_uas->getParamManager()->setParameter(1,"BATT_CURR_PIN",2);
     }
     else if (index == 2) //APM2.5
     {
+        QLOG_DEBUG() << "APM2.5 Power Module settings";
         m_uas->getParamManager()->setParameter(1,"BATT_VOLT_PIN",13);
         m_uas->getParamManager()->setParameter(1,"BATT_CURR_PIN",12);
     }
     else if (index == 3) //PX4
     {
+        QLOG_DEBUG() << "PX4 settings";
         m_uas->getParamManager()->setParameter(1,"BATT_VOLT_PIN",100);
         m_uas->getParamManager()->setParameter(1,"BATT_CURR_PIN",101);
-        m_uas->getParamManager()->setParameter(1,"VOLT_DIVIDER",1);
+        m_uas->getParamManager()->setParameter(1,m_voltDividerParam,1);
         ui.calcDividerLineEdit->setText("1");
         disconnect(ui.sensorComboBox,SIGNAL(currentIndexChanged(int)),this,SLOT(monitorCurrentIndexChanged(int)));
         ui.sensorComboBox->setCurrentIndex(0); //PX4 must be other
         connect(ui.sensorComboBox,SIGNAL(currentIndexChanged(int)),this,SLOT(monitorCurrentIndexChanged(int)));
     }
-    else if (index == 4) //Pixhawk
+    else if (index == 4) //Pixhawk - 4in1 ESC
     {
+        QLOG_DEBUG() << "Pixhawk settings";
         m_uas->getParamManager()->setParameter(1,"BATT_MONITOR",4);
         m_uas->getParamManager()->setParameter(1,"BATT_VOLT_PIN",2);
         m_uas->getParamManager()->setParameter(1,"BATT_CURR_PIN",3);
-        m_uas->getParamManager()->setParameter(1,"AMP_PER_VOLT",(float)17);
-        m_uas->getParamManager()->setParameter(1,"VOLT_DIVIDER",(float)10.1);
-        ui.calcDividerLineEdit->setText("1");
-        ui.ampsPerVoltsLineEdit->setText("17");
+        m_uas->getParamManager()->setParameter(1,m_ampPerVoltParam,(float)17);
+        m_uas->getParamManager()->setParameter(1,m_voltDividerParam,(float)12.02);
+        ui.calcDividerLineEdit->setText("12.02");
+        ui.ampsPerVoltsLineEdit->setText("17.0");
         disconnect(ui.sensorComboBox,SIGNAL(currentIndexChanged(int)),this,SLOT(monitorCurrentIndexChanged(int)));
-        ui.sensorComboBox->setCurrentIndex(0); //Pixhawk must be other
+        ui.sensorComboBox->setCurrentIndex(0); //Pixhawk using 3DR Power Module
+        connect(ui.sensorComboBox,SIGNAL(currentIndexChanged(int)),this,SLOT(monitorCurrentIndexChanged(int)));
+    }
+    else if (index == 5) //Pixhawk 3DR Power Module
+    {
+        QLOG_DEBUG() << "Pixhawk settings";
+        m_uas->getParamManager()->setParameter(1,"BATT_MONITOR",4);
+        m_uas->getParamManager()->setParameter(1,"BATT_VOLT_PIN",2);
+        m_uas->getParamManager()->setParameter(1,"BATT_CURR_PIN",3);
+        m_uas->getParamManager()->setParameter(1,m_ampPerVoltParam,(float)17);
+        m_uas->getParamManager()->setParameter(1,m_voltDividerParam,(float)10.1);
+        ui.calcDividerLineEdit->setText("10.1");
+        ui.ampsPerVoltsLineEdit->setText("17.0");
+        disconnect(ui.sensorComboBox,SIGNAL(currentIndexChanged(int)),this,SLOT(monitorCurrentIndexChanged(int)));
+        ui.sensorComboBox->setCurrentIndex(0); //Pixhawk using 3DR Power Module
         connect(ui.sensorComboBox,SIGNAL(currentIndexChanged(int)),this,SLOT(monitorCurrentIndexChanged(int)));
     }
 }
@@ -326,21 +380,81 @@ void BatteryMonitorConfig::batteryChanged(UASInterface* uas, double voltage, dou
     {
         ui.measuredVoltsLineEdit->setText(ui.calcVoltsLineEdit->text());
     }
+    ui.batteryCurrentLineEdit->setText(QString::number(current,'f',2));
+}
+
+void BatteryMonitorConfig::checkSensorType()
+{
+//    if (m_savedAmpsPerVolts < 14 && m_savedAmpsPerVolts > 13 && m_savedVoltDivider < 5 && m_savedVoltDivider > 4)
+//    {
+//        //atto45
+//        QLOG_DEBUG() << "Setting ATTO 45 sensor";
+//        ui.sensorComboBox->setCurrentIndex(1);
+//    }
+//    else if (m_savedAmpsPerVolts < 28 && m_savedAmpsPerVolts > 27 && m_savedVoltDivider < 16 && m_savedVoltDivider > 15)
+//    {
+//        //atto90
+//        QLOG_DEBUG() << "Setting ATTO 90 sensor";
+//        ui.sensorComboBox->setCurrentIndex(2);
+//    }
+//    else if (m_savedAmpsPerVolts < 55 && m_savedAmpsPerVolts > 54 && m_savedVoltDivider < 16 && m_savedVoltDivider > 15)
+//    {
+//        //atto180
+//        QLOG_DEBUG() << "Setting ATTO 180 sensor";
+//        ui.sensorComboBox->setCurrentIndex(3);
+//    }
+//    else if (m_savedAmpsPerVolts < 19 && m_savedAmpsPerVolts > 18 && m_savedVoltDivider < 11 && m_savedVoltDivider > 9)
+//    {
+//        //3dr
+//        QLOG_DEBUG() << "Setting 3DR Power Module sensor";
+//        ui.sensorComboBox->setCurrentIndex(4);
+//    }
+//    else if (m_savedAmpsPerVolts < 18 && m_savedAmpsPerVolts > 16 && m_savedVoltDivider < 13 && m_savedVoltDivider > 12)
+//    {
+//        //pixhawk with 3dr
+//        QLOG_DEBUG() << "Setting 3DR with Pixhawk sensor";
+//        ui.sensorComboBox->setCurrentIndex(4);
+//    }
 }
 
 void BatteryMonitorConfig::parameterChanged(int uas, int component, QString parameterName, QVariant value)
 {
     if (parameterName == "VOLT_DIVIDER")
     {
+        QLOG_DEBUG() << "Received VOLT_DIVIDER parameter";
+        m_voltDividerParam = parameterName;
         ui.calcDividerLineEdit->setText(QString::number(value.toFloat(),'f',6));
+        m_savedVoltDivider = value.toFloat();
+        checkSensorType();
+    }
+    else if (parameterName == "BATT_VOLT_MULT")
+    {
+        QLOG_DEBUG() << "Received BATT_VOLT_MULT parameter";
+        m_voltDividerParam = parameterName;
+        ui.calcDividerLineEdit->setText(QString::number(value.toFloat(),'f',6));
+        m_savedVoltDivider = value.toFloat();
+        checkSensorType();
     }
     else if (parameterName == "AMP_PER_VOLT")
     {
-        ui.ampsPerVoltsLineEdit->setText(QString::number(value.toFloat(),'g',4));
+        QLOG_DEBUG() << "Received AMP_PER_VOLT parameter";
+        m_ampPerVoltParam = parameterName;
+        ui.ampsPerVoltsLineEdit->setText(QString::number(value.toFloat(),'f',4));
+        m_savedAmpsPerVolts = value.toFloat();
+        checkSensorType();
+    }
+    else if (parameterName == "BATT_AMP_PERVOLT")
+    {
+        QLOG_DEBUG() << "Received BATT_AMP_PERVOLT parameter";
+        m_ampPerVoltParam = parameterName;
+        ui.ampsPerVoltsLineEdit->setText(QString::number(value.toFloat(),'f',4));
+        m_savedAmpsPerVolts = value.toFloat();
+        checkSensorType();
 
     }
     else if (parameterName == "BATT_MONITOR")
     {
+        QLOG_DEBUG() << "Received BATT_MONITOR combobox";
         disconnect(ui.monitorComboBox,SIGNAL(currentIndexChanged(int)),this,SLOT(monitorCurrentIndexChanged(int)));
         if (value.toInt() == 0) //0: Disable
         {
@@ -358,11 +472,14 @@ void BatteryMonitorConfig::parameterChanged(int uas, int component, QString para
     }
     else if (parameterName == "BATT_CAPACITY")
     {
+        QLOG_DEBUG() << "Received BATT_CAPACITY" << QString::number(value.toFloat());
         ui.battCapacityLineEdit->setText(QString::number(value.toFloat()));
     }
     else if (parameterName == "BATT_VOLT_PIN")
     {
         int ivalue = value.toInt();
+        QLOG_DEBUG() << "Received BATT_VOLT_PIN combo index to:" << ivalue;
+
         disconnect(ui.apmVerComboBox,SIGNAL(currentIndexChanged(int)),this,SLOT(apmVerCurrentIndexChanged(int)));
         if (ivalue == 0) //APM1
         {
@@ -388,6 +505,7 @@ void BatteryMonitorConfig::parameterChanged(int uas, int component, QString para
     }
     else if (parameterName == "BATT_CURR_PIN")
     {
+        QLOG_DEBUG() << "Received paramter BATT_CURR_PIN";
         //Unused at the moment, everything is off BATT_VOLT_PIN
     }
 }

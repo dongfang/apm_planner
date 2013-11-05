@@ -53,14 +53,14 @@ ApmHardwareConfig::ApmHardwareConfig(QWidget *parent) : QWidget(parent),
     ui.opticalFlowButton->setVisible(false);
     ui.osdButton->setVisible(false);
     ui.cameraGimbalButton->setVisible(false);
-    ui.radio3DRButton->setVisible(false);
     ui.antennaTrackerButton->setVisible(false);
 
     ui.hiddenPushButton->setVisible(false); // And it's checked.
-    ui.radio3DRLargeButton->setVisible(true);
-    ui.antennaTrackerLargeButton->setVisible(true);
+    ui.radio3DRLargeButton->setVisible(true); // [SHOW 3DR RADIO]
+    ui.antennaTrackerLargeButton->setVisible(false); // [HIDE Antenna Tracking]
 
     m_apmFirmwareConfig = new ApmFirmwareConfig(this);
+    connect(m_apmFirmwareConfig,SIGNAL(showBlankingScreen()),this,SLOT(activateBlankingScreen()));
     ui.stackedWidget->addWidget(m_apmFirmwareConfig); //Firmware placeholder.
     m_buttonToConfigWidgetMap[ui.firmwareButton] = m_apmFirmwareConfig;
     connect(ui.firmwareButton,SIGNAL(clicked()),this,SLOT(activateStackedWidget()));
@@ -102,9 +102,7 @@ ApmHardwareConfig::ApmHardwareConfig(QWidget *parent) : QWidget(parent),
 
     m_radio3drConfig = new Radio3DRConfig(this);
     ui.stackedWidget->addWidget(m_radio3drConfig);
-    m_buttonToConfigWidgetMap[ui.radio3DRButton] = m_radio3drConfig;
     m_buttonToConfigWidgetMap[ui.radio3DRLargeButton] = m_radio3drConfig;
-    connect(ui.radio3DRButton,SIGNAL(clicked()),this,SLOT(activateStackedWidget()));
     connect(ui.radio3DRLargeButton,SIGNAL(clicked()),this,SLOT(activateStackedWidget()));
 
     m_batteryConfig = new BatteryMonitorConfig(this);
@@ -160,15 +158,16 @@ ApmHardwareConfig::ApmHardwareConfig(QWidget *parent) : QWidget(parent),
     ui.globalParamProgressBar->setRange(0,100);
 
     ui.mandatoryHardware->setChecked(true);
-    connect(ui.optionalHardwareButton, SIGNAL(clicked()),
-            this, SLOT(optionalClicked()));
-    connect(ui.mandatoryHardware, SIGNAL(clicked()),
-            this, SLOT(mandatoryClicked()));
 
     // Set start up WarningMessageView view
     ui.stackedWidget->setCurrentWidget(m_buttonToConfigWidgetMap[ui.hiddenPushButton]);
     ui.hiddenPushButton->setChecked(true);
 }
+void ApmHardwareConfig::activateBlankingScreen()
+{
+        ui.stackedWidget->setCurrentWidget(m_setupWarningMessage);
+}
+
 void ApmHardwareConfig::activateStackedWidget()
 {
     if (ui.failSafeButton == sender())
@@ -191,6 +190,10 @@ void ApmHardwareConfig::uasConnected()
         return;
     }
     QLOG_DEBUG() << "AHC: uasConnected()";
+    connect(ui.optionalHardwareButton, SIGNAL(clicked()),
+            this, SLOT(optionalClicked()),Qt::UniqueConnection);
+    connect(ui.mandatoryHardware, SIGNAL(clicked()),
+            this, SLOT(mandatoryClicked()),Qt::UniqueConnection);
     // Hide offline options and show Optional and Mandatory buttons
     ui.radio3DRLargeButton->setVisible(false);
     ui.antennaTrackerLargeButton->setVisible(false);
@@ -214,15 +217,14 @@ void ApmHardwareConfig::uasDisconnected()
     }
     QLOG_DEBUG() << "AHC: uasDisconnected()";
     // Show offline options and hide Optional and Mandatory buttons
-    disconnect(ui.mandatoryHardware, SIGNAL(clicked(bool)),
-                this, SLOT(mandatoryClicked(bool)));
-    disconnect(ui.optionalHardwareButton, SIGNAL(clicked(bool)),
-                this, SLOT(optionalClicked(bool)));
+    disconnect(ui.mandatoryHardware, SIGNAL(clicked()),
+                this, SLOT(mandatoryClicked()));
+    disconnect(ui.optionalHardwareButton, SIGNAL(clicked()),
+                this, SLOT(optionalClicked()));
 
     ui.optionalHardwareButton->setChecked(false);
     ui.optionalHardwareButton->setVisible(false);
 
-    ui.radio3DRButton->setVisible(false);
     ui.antennaTrackerButton->setVisible(false);
 
     ui.mandatoryHardware->setVisible(false);
@@ -243,8 +245,8 @@ void ApmHardwareConfig::uasDisconnected()
     ui.osdButton->setShown(false);
     ui.cameraGimbalButton->setShown(false);
 
-    ui.radio3DRLargeButton->setVisible(true);
-    ui.antennaTrackerLargeButton->setVisible(true);
+    ui.radio3DRLargeButton->setVisible(true); // [SHOW 3DR RADIO]
+    ui.antennaTrackerLargeButton->setVisible(false); // [HIDE Antenna Tracking]
 
     ui.stackedWidget->setCurrentWidget(m_buttonToConfigWidgetMap[ui.hiddenPushButton]);
     ui.hiddenPushButton->setChecked(true);
@@ -329,12 +331,11 @@ void ApmHardwareConfig::toggleButtonsShown(bool show)
         ui.failSafeButton->setShown(show);
 
         // Optional Options to Hide
-        ui.radio3DRButton->setShown(!show);
         ui.batteryMonitorButton->setShown(!show);
         ui.opticalFlowButton->setShown(!show);
         ui.osdButton->setShown(!show);
-        ui.cameraGimbalButton->setShown(!show);
-        ui.antennaTrackerButton->setShown(!show);
+//        ui.cameraGimbalButton->setShown(!show);// [HIDE Camera Gimbal]
+//        ui.antennaTrackerButton->setShown(!show);// [HIDE Antenna Tracking]
         ui.sonarButton->setShown(!show);
 
     } else if (m_uas->isFixedWing()){
@@ -350,12 +351,11 @@ void ApmHardwareConfig::toggleButtonsShown(bool show)
         ui.failSafeButton->setShown(show);
 
         // Optional Options to Hide
-        ui.radio3DRButton->setShown(!show);
         ui.batteryMonitorButton->setShown(!show);
         ui.opticalFlowButton->setShown(!show);
         ui.osdButton->setShown(!show);
-        ui.cameraGimbalButton->setShown(!show);
-        ui.antennaTrackerButton->setShown(!show);
+//        ui.cameraGimbalButton->setShown(!show); // // [HIDE Camera Gimbal]
+//        ui.antennaTrackerButton->setShown(!show); // [HIDE Antenna Tracking]
         ui.airspeedButton->setShown(!show);
 
     } else {
@@ -373,12 +373,12 @@ void ApmHardwareConfig::toggleButtonsShown(bool show)
         ui.failSafeButton->setShown(show);
 
         // Optional Options to Hide
-        ui.radio3DRButton->setShown(!show);
+//        ui.radio3DRButton->setShown(!show); [HIDE 3DR RADIO]
         ui.batteryMonitorButton->setShown(!show);
         ui.opticalFlowButton->setShown(!show);
         ui.osdButton->setShown(!show);
-        ui.cameraGimbalButton->setShown(!show);
-        ui.antennaTrackerButton->setShown(!show);
+//        ui.cameraGimbalButton->setShown(!show); // [HIDE Camera Gimbal]
+//        ui.antennaTrackerButton->setShown(!show); // [HIDE Antenna Tracking]
         ui.sonarButton->setShown(!show);
     }
 }

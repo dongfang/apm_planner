@@ -6,6 +6,11 @@
 class QGCRadioChannelDisplay : public QWidget
 {
     Q_OBJECT
+
+static const int native = 0;
+static const int indoor = 1;
+static const int outdoor = 2;
+
 public:
     explicit QGCRadioChannelDisplay(QWidget *parent = 0);
     void setOrientation(Qt::Orientation orient);
@@ -27,6 +32,9 @@ private:
     int m_max;
     bool m_showMinMax;
     QString m_name;
+    QBrush m_fillBrush;
+    int m_style;
+
 signals:
     
 public slots:

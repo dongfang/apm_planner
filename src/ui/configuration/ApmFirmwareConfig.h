@@ -41,6 +41,9 @@ This file is part of the APM_PLANNER project
 #include <QMessageBox>
 #include <QProcess>
 #include <QScrollBar>
+#include <QProgressDialog>
+#include <QTimer>
+
 #include "UASInterface.h"
 #include "UASManager.h"
 
@@ -56,7 +59,8 @@ class ApmFirmwareConfig : public QWidget
 public:
     explicit ApmFirmwareConfig(QWidget *parent = 0);
     ~ApmFirmwareConfig();
-
+signals:
+    void showBlankingScreen();
 protected:
     void showEvent(QShowEvent *event);
     void hideEvent(QHideEvent *event);
@@ -65,7 +69,8 @@ private slots:
     void firmwareListFinished();
     void firmwareListError(QNetworkReply::NetworkError error);
     void flashButtonClicked();
-    void betaFirmwareButtonClicked(bool betafirmwareenabled);
+    void betaFirmwareButtonClicked();
+    void stableFirmwareButtonClicked();
     void downloadFinished();
     void trunkFirmwareButtonClicked();
     void firmwareProcessFinished(int status);
@@ -82,11 +87,20 @@ private slots:
     void cancelButtonClicked();
     void populateSerialPorts();
     void requestDeviceReplug();
+    void devicePlugDetected();
     void px4Error(QString error);
     void px4Finished();
     void px4Terminated();
     void px4StatusUpdate(QString update);
+    void px4DebugUpdate(QString update);
+    void px4UnplugTimerTick();
+
+    void flashCustomFirmware();
+    void flashFirmware(QString filename);
+
 private:
+    QProgressDialog *m_replugRequestMessageBox;
+    QTimer *m_px4UnplugTimer;
     PX4FirmwareUploader *m_px4uploader;
     QString m_firmwareType;
     QString m_autopilotType;

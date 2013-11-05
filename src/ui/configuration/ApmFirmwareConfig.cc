@@ -38,11 +38,16 @@ ApmFirmwareConfig::ApmFirmwareConfig(QWidget *parent) : QWidget(parent)
     m_port=0;
     m_hasError=0;
     //firmwareStatus = 0;
+    m_replugRequestMessageBox = 0;
+    m_px4UnplugTimer=0;
     m_betaFirmwareChecked = false;
     m_trunkFirmwareChecked = false;
-    m_tempFirmwareFile=0;
+    m_tempFirmwareFile=NULL;
     ui.progressBar->setVisible(false);
+    ui.cancelPushButton->setVisible(false);
+    ui.rebootButton->setVisible(false);
     ui.warningLabel->setVisible(false);
+    ui.textBrowser->setVisible(false);
     m_firmwareType = "stable";
     m_autopilotType = "apm";
     m_px4uploader = 0;
@@ -64,20 +69,25 @@ ApmFirmwareConfig::ApmFirmwareConfig(QWidget *parent) : QWidget(parent)
     connect(ui.quadPushButton,SIGNAL(clicked()),this,SLOT(flashButtonClicked()));
     connect(ui.triPushButton,SIGNAL(clicked()),this,SLOT(flashButtonClicked()));
     connect(ui.y6PushButton,SIGNAL(clicked()),this,SLOT(flashButtonClicked()));
+
+    connect(ui.flashCustomFWButton,SIGNAL(clicked()),this,SLOT(flashCustomFirmware()));
+
     QTimer::singleShot(10000,this,SLOT(requestFirmwares()));
-    connect(ui.betaFirmwareButton,SIGNAL(clicked(bool)),this,SLOT(betaFirmwareButtonClicked(bool)));
+
+    connect(ui.betaFirmwareButton,SIGNAL(clicked()),this,SLOT(betaFirmwareButtonClicked()));
+    connect(ui.stableFirmwareButton,SIGNAL(clicked()),this,SLOT(stableFirmwareButtonClicked()));
+
     ui.betaFirmwareButton->setContextMenuPolicy(Qt::ActionsContextMenu);
     QAction *action = new QAction(QString("Load Trunk Firmware"),ui.betaFirmwareButton);
     connect(action,SIGNAL(triggered()),this,SLOT(trunkFirmwareButtonClicked()));
     ui.betaFirmwareButton->addAction(action);
+
     connect(ui.cancelPushButton,SIGNAL(clicked()),this,SLOT(cancelButtonClicked()));
-    ui.cancelPushButton->setEnabled(false);
-    ui.cancelPushButton->setVisible(false);
 
     ui.progressBar->setMaximum(100);
     ui.progressBar->setValue(0);
 
-    ui.textBrowser->setVisible(false);
+    ui.textBrowser->setEnabled(false);
     connect(ui.showOutputCheckBox,SIGNAL(clicked(bool)),ui.textBrowser,SLOT(setShown(bool)));
 
     connect(ui.linkComboBox,SIGNAL(currentIndexChanged(int)),this,SLOT(setLink(int)));
@@ -95,6 +105,7 @@ ApmFirmwareConfig::ApmFirmwareConfig(QWidget *parent) : QWidget(parent)
     if (ui.linkComboBox->count() > 0)
     {
         QLOG_DEBUG() << "Setting ApmFirmware link to 0";
+        requestFirmwares(m_firmwareType,"apm");
         setLink(0);
     }
     else
@@ -123,10 +134,15 @@ void ApmFirmwareConfig::populateSerialPorts()
              << (info.vendorIdentifier() ? QString::number(info.vendorIdentifier(), 16) : QString())
              << (info.productIdentifier() ? QString::number(info.productIdentifier(), 16) : QString());
 
-        if (!(info.portName().contains("Bluetooth"))){
+        if (!(info.portName().contains("Bluetooth")))
+        {
             // Don't add bluetooth ports to be less confusing to the user
             // on windows, the friendly name is annoyingly identical between devices. On OSX it's different
-            ui.linkComboBox->insertItem(0,list[0], list);
+            // We also want to only display COM ports for PX4/Pixhawk, or arduino mega 2560's.
+            if (info.description().toLower().contains("px4") || info.description().toLower().contains("mega"))
+            {
+                ui.linkComboBox->insertItem(0,list[0], list);
+            }
             //QLOG_DEBUG() << "Inserting " << list.first();
         }
     }
@@ -169,6 +185,10 @@ void ApmFirmwareConfig::uasConnected()
 }
 void ApmFirmwareConfig::cancelButtonClicked()
 {
+    if (m_isPx4 && !m_px4uploader)
+    {
+        return;
+    }
     if (QMessageBox::question(this,tr("Warning"),tr("You are about to cancel the firmware upload process. ONLY do this if the process has not started properly. Are you sure you want to continue?"),QMessageBox::Yes,QMessageBox::No) != QMessageBox::Yes)
     {
         return;
@@ -176,7 +196,22 @@ void ApmFirmwareConfig::cancelButtonClicked()
     if (m_isPx4)
     {
         m_px4uploader->stop();
+        m_px4uploader->wait(250);
         ui.statusLabel->setText("Flashing Canceled");
+        m_px4uploader->deleteLater();
+        m_px4uploader = 0;
+        if (m_px4UnplugTimer)
+        {
+            m_px4UnplugTimer->stop();
+            m_px4UnplugTimer->deleteLater();
+            m_px4UnplugTimer = 0;
+        }
+        if (m_replugRequestMessageBox)
+        {
+            m_replugRequestMessageBox->hide();
+            m_replugRequestMessageBox->deleteLater();
+            m_replugRequestMessageBox = 0;
+        }
         return;
     }
     if (m_burnProcess){
@@ -189,6 +224,11 @@ void ApmFirmwareConfig::cancelButtonClicked()
 void ApmFirmwareConfig::px4StatusUpdate(QString update)
 {
     ui.statusLabel->setText(update);
+    ui.textBrowser->append(update);
+}
+void ApmFirmwareConfig::px4DebugUpdate(QString update)
+{
+    ui.textBrowser->append(update);
 }
 
 void ApmFirmwareConfig::uasDisconnected()
@@ -260,6 +300,7 @@ void ApmFirmwareConfig::requestFirmwares(QString type,QString autopilot)
 {
     //type can be "stable" "beta" or "latest"
     //autopilot can be "apm" "px4" or "pixhawk"
+    QLOG_DEBUG() << "Requesting firmware:" << type << autopilot;
     m_betaFirmwareChecked = false;
     m_trunkFirmwareChecked = false;
     hideBetaLabels();
@@ -276,6 +317,14 @@ void ApmFirmwareConfig::requestFirmwares(QString type,QString autopilot)
     {
         prestring = "PX4";
     }
+    if (type != "stable")
+    {
+        ui.warningLabel->show();
+    }
+    else
+    {
+        ui.warningLabel->hide();
+    }
     m_autopilotType = autopilot;
     m_firmwareType = type;
     QNetworkReply *reply1 = m_networkManager->get(QNetworkRequest(QUrl("http://firmware.diydrones.com/Copter/" + type + "/" + prestring + "-heli/git-version.txt")));
@@ -288,7 +337,19 @@ void ApmFirmwareConfig::requestFirmwares(QString type,QString autopilot)
     QNetworkReply *reply8 = m_networkManager->get(QNetworkRequest(QUrl("http://firmware.diydrones.com/Plane/" + type + "/" + prestring + "/git-version.txt")));
     QNetworkReply *reply9 = m_networkManager->get(QNetworkRequest(QUrl("http://firmware.diydrones.com/Rover/" + type + "/" + prestring + "/git-version.txt")));
 
-    if (autopilot == "apm" || autopilot == "px4")
+    if (autopilot == "apm")
+    {
+        m_buttonToUrlMap[ui.roverPushButton] = "http://firmware.diydrones.com/Rover/" + type + "/" + prestring + "/APMrover2.hex";
+        m_buttonToUrlMap[ui.planePushButton] = "http://firmware.diydrones.com/Plane/" + type + "/" + prestring + "/ArduPlane.hex";
+        m_buttonToUrlMap[ui.copterPushButton] = "http://firmware.diydrones.com/Copter/" + type + "/" + prestring + "-heli/ArduCopter.hex";
+        m_buttonToUrlMap[ui.hexaPushButton] = "http://firmware.diydrones.com/Copter/" + type + "/" + prestring + "-hexa/ArduCopter.hex";
+        m_buttonToUrlMap[ui.octaQuadPushButton] = "http://firmware.diydrones.com/Copter/" + type + "/" + prestring + "-octa-quad/ArduCopter.hex";
+        m_buttonToUrlMap[ui.octaPushButton] = "http://firmware.diydrones.com/Copter/" + type + "/" + prestring + "-octa/ArduCopter.hex";
+        m_buttonToUrlMap[ui.quadPushButton] = "http://firmware.diydrones.com/Copter/" + type + "/" + prestring + "-quad/ArduCopter.hex";
+        m_buttonToUrlMap[ui.triPushButton] = "http://firmware.diydrones.com/Copter/" + type + "/" + prestring + "-tri/ArduCopter.hex";
+        m_buttonToUrlMap[ui.y6PushButton] = "http://firmware.diydrones.com/Copter/" + type + "/" + prestring + "-y6/ArduCopter.hex";
+    }
+    else if (autopilot == "px4")
     {
         m_buttonToUrlMap[ui.roverPushButton] = "http://firmware.diydrones.com/Rover/" + type + "/" + prestring + "/APMrover2-v1.px4";
         m_buttonToUrlMap[ui.planePushButton] = "http://firmware.diydrones.com/Plane/" + type + "/" + prestring + "/ArduPlane-v1.px4";
@@ -312,6 +373,10 @@ void ApmFirmwareConfig::requestFirmwares(QString type,QString autopilot)
         m_buttonToUrlMap[ui.triPushButton] = "http://firmware.diydrones.com/Copter/" + type + "/" + prestring + "-tri/ArduCopter-v2.px4";
         m_buttonToUrlMap[ui.y6PushButton] = "http://firmware.diydrones.com/Copter/" + type + "/" + prestring + "-y6/ArduCopter-v2.px4";
     }
+    else
+    {
+        QLOG_ERROR() << "Unknown autopilot in ApmFirmwareConfig::requestFirmwares()" << autopilot;
+    }
 
     //http://firmware.diydrones.com/Plane/stable/apm2/ArduPlane.hex
     connect(reply1,SIGNAL(finished()),this,SLOT(firmwareListFinished()));
@@ -332,34 +397,29 @@ void ApmFirmwareConfig::requestFirmwares(QString type,QString autopilot)
     connect(reply8,SIGNAL(error(QNetworkReply::NetworkError)),this,SLOT(firmwareListError(QNetworkReply::NetworkError)));
     connect(reply9,SIGNAL(finished()),this,SLOT(firmwareListFinished()));
     connect(reply9,SIGNAL(error(QNetworkReply::NetworkError)),this,SLOT(firmwareListError(QNetworkReply::NetworkError)));
-    QLOG_DEBUG() << "Getting Stable firmware...";
 }
 
-void ApmFirmwareConfig::betaFirmwareButtonClicked(bool betafirmwareenabled)
+void ApmFirmwareConfig::betaFirmwareButtonClicked()
 {
     QLOG_DEBUG() << "Beta FW Button clicked";
 
-    if (betafirmwareenabled)
-    {
-        QMessageBox::information(this,tr("Warning"),tr("These are beta firmware downloads. Use at your own risk!!!"));
-        ui.label->setText(tr("<h2>Beta Firmware</h2>"));
-        ui.betaFirmwareButton->setText(tr("Stable Firmware"));
-        //equestBetaFirmwares();
-        showBetaLabels();
-        requestFirmwares("beta",m_autopilotType);
-    }
-    else
-    {
-        ui.label->setText(tr("<h2>Firmware</h2>"));
-        ui.betaFirmwareButton->setText(tr("Beta Firmware"));
-        requestFirmwares("stable",m_autopilotType);
-    }
+    QMessageBox::information(this,tr("Warning"),tr("These are beta firmware downloads. Use at your own risk!!!"));
+    ui.label->setText(tr("<h2>Beta Firmware</h2>"));
+    //equestBetaFirmwares();
+    showBetaLabels();
+    requestFirmwares("beta",m_autopilotType);
 }
+
+void ApmFirmwareConfig::stableFirmwareButtonClicked()
+{
+    ui.label->setText(tr("<h2>Firmware</h2>"));
+    requestFirmwares("stable",m_autopilotType);
+}
+
 void ApmFirmwareConfig::trunkFirmwareButtonClicked()
 {
     QMessageBox::information(this,tr("Warning"),tr("These are trunk firmware downloads. These should ONLY BE USED if you know what you're doing!!!"));
     ui.label->setText(tr("<h2>Trunk Firmware</h2>"));
-    ui.betaFirmwareButton->setText(tr("Stable Firmware"));
     ui.betaFirmwareButton->setChecked(true);
     requestFirmwares("latest",m_autopilotType);
 }
@@ -392,14 +452,18 @@ void ApmFirmwareConfig::firmwareProcessFinished(int status)
         ui.progressBar->setValue(100);
         if (!m_hasError)
         {
-            ui.statusLabel->setText(tr("Upload complete"));
+            QMessageBox::information(this,"Complete","APM Flashing is complete!");
+            ui.statusLabel->setText(tr("Flashing complete"));
+            emit showBlankingScreen();
+        } else {
+            QMessageBox::critical(this,"FAILED","APM Flashing FAILED!");
+            ui.statusLabel->setText(tr("Flashing FAILED!"));
         }
     }
     //QLOG_DEBUG() << "Upload finished!" << QString::number(status);
-    m_tempFirmwareFile->deleteLater(); //This will remove the temporary file.
-    m_tempFirmwareFile = 0;
+    if (m_tempFirmwareFile) m_tempFirmwareFile->deleteLater(); //This will remove the temporary file.
+    m_tempFirmwareFile = NULL;
     ui.progressBar->setVisible(false);
-    ui.cancelPushButton->setEnabled(false);
     ui.cancelPushButton->setVisible(false);
 
 }
@@ -413,6 +477,7 @@ void ApmFirmwareConfig::px4Terminated()
     if (m_px4uploader)
     {
         m_px4uploader->deleteLater();
+        m_px4uploader = 0;
         m_isPx4 = false;
     }
 }
@@ -422,8 +487,16 @@ void ApmFirmwareConfig::px4Finished()
     ui.progressBar->setValue(100);
     if (!m_hasError)
     {
-        ui.statusLabel->setText(tr("Upload complete"));
+        ui.statusLabel->setText(tr("Flashing complete"));
+        QMessageBox::information(this,"Complete","PX4 Flashing is complete!");
+    } else {
+        ui.statusLabel->setText(tr("Flashing FAILED!"));
+        QMessageBox::critical(this,"FAILED","PX4 Flashing failed!");
     }
+
+    emit showBlankingScreen();
+    ui.progressBar->setVisible(false);
+    ui.cancelPushButton->setVisible(false);
 }
 
 void ApmFirmwareConfig::firmwareProcessReadyRead()
@@ -505,16 +578,22 @@ void ApmFirmwareConfig::downloadFinished()
         ui.textBrowser->append("Error Text: " + reply->errorString());
         return;
     }
-    qDebug() << "Error:" << reply->errorString() << reply->error();
     QByteArray hex = reply->readAll();
     m_tempFirmwareFile = new QTemporaryFile();
     m_tempFirmwareFile->open();
     m_tempFirmwareFile->write(hex);
     m_tempFirmwareFile->flush();
     m_tempFirmwareFile->close();
-    //tempfirmware.fileName()
-    ui.cancelPushButton->setEnabled(true);
+
+    QLOG_DEBUG() << "Temp file to flash is: " << m_tempFirmwareFile->fileName();
+    flashFirmware(m_tempFirmwareFile->fileName());
+}
+
+
+ void ApmFirmwareConfig::flashFirmware(QString filename)
+ {
     ui.cancelPushButton->setVisible(true);
+    ui.progressBar->setVisible(true);
     m_burnProcess = new QProcess(this);
     connect(m_burnProcess,SIGNAL(finished(int)),this,SLOT(firmwareProcessFinished(int)));
     connect(m_burnProcess,SIGNAL(readyReadStandardOutput()),this,SLOT(firmwareProcessReadyRead()));
@@ -535,84 +614,161 @@ void ApmFirmwareConfig::downloadFinished()
     //info.manufacturer() == "Arduino LLC (www.arduino.cc)"
     //info.description() == "%mega2560.name%"
 
-    QLOG_DEBUG() << "Attempting to Open port";
+    if (m_autopilotType == "apm")
+    {
 
-/*
-    m_port= new QSerialPort(this);
-    m_port->setPortName(m_settings.name);
-    if (m_port->open(QIODevice::ReadWrite)) {
-        if (m_port->setBaudRate(m_settings.baudRate)
-                && m_port->setDataBits(m_settings.dataBits)
-                && m_port->setParity(m_settings.parity)
-                && m_port->setStopBits(m_settings.stopBits)
-                && m_port->setFlowControl(m_settings.flowControl)) {
-            QLOG_INFO() << "Open Terminal Console Serial Port";
-            m_port->setDataTerminalReady(true);
-            m_port->waitForBytesWritten(250);
-            m_port->setDataTerminalReady(false);
-            m_port->close();
+        QLOG_DEBUG() << "Attempting to Open port";
+
+
+        m_port= new QSerialPort(this);
+        m_port->setPortName(m_settings.name);
+        if (m_port->open(QIODevice::ReadWrite)) {
+            if (m_port->setBaudRate(m_settings.baudRate)
+                    && m_port->setDataBits(m_settings.dataBits)
+                    && m_port->setParity(m_settings.parity)
+                    && m_port->setStopBits(m_settings.stopBits)
+                    && m_port->setFlowControl(m_settings.flowControl)) {
+                QLOG_INFO() << "Open Terminal Console Serial Port";
+                m_port->setDataTerminalReady(true);
+                m_port->waitForBytesWritten(250);
+                m_port->setDataTerminalReady(false);
+                m_port->close();
+            } else {
+                m_port->close();
+                QMessageBox::critical(this, tr("Error"), m_port->errorString());
+                m_port->deleteLater();
+                return;
+            }
         } else {
-            m_port->close();
             QMessageBox::critical(this, tr("Error"), m_port->errorString());
             m_port->deleteLater();
             return;
         }
-    } else {
-        QMessageBox::critical(this, tr("Error"), m_port->errorString());
-        m_port->deleteLater();
-        return;
-    }*/
+        QLOG_INFO() << "Port Open for FW Upload";
+        QString avrdudeExecutable;
+        QStringList stringList;
 
-    QLOG_INFO() << "Port Open for FW Upload";
-    if (m_autopilotType == "apm")
-    {
-
-    QString avrdudeExecutable;
-    QStringList stringList;
-
-    ui.statusLabel->setText(tr("Flashing"));
+        ui.statusLabel->setText(tr("Flashing"));
 #ifdef Q_OS_WIN
-    stringList = QStringList() << "-Cavrdude/avrdude.conf" << "-pm2560"
-                               << "-cstk500" << QString("-P").append(m_settings.name)
-                               << QString("-Uflash:w:").append(m_tempFirmwareFile->fileName()).append(":i");
+        stringList = QStringList() << "-Cavrdude/avrdude.conf" << "-pm2560"
+                                   << "-cstk500" << QString("-P").append(m_settings.name)
+                                   << QString("-Uflash:w:").append(filename).append(":i");
 
-    avrdudeExecutable = "avrdude/avrdude.exe";
+        avrdudeExecutable = "avrdude/avrdude.exe";
 #endif
 #ifdef Q_OS_MAC
-    stringList = QStringList() << "-v" << "-pm2560"
-                                           << "-cstk500" << QString("-P/dev/cu.").append(m_settings.name)
-                                           << QString("-Uflash:w:").append(m_tempFirmwareFile->fileName()).append(":i");
-    avrdudeExecutable = "/usr/local/CrossPack-AVR/bin/avrdude";
+
+        // Check for avrdude in the /usr/local/bin
+        // This could be that a user install this via brew etc..
+        QFile avrdude;
+
+        if (avrdude.exists("/usr/local/bin/avrdude")){
+            // Use the copy in /user/local/bin
+            avrdudeExecutable = "/usr/local/bin/avrdude";
+
+        } else if (avrdude.exists("/usr/local/CrossPack-AVR/bin/avrdude")){
+            // Use the installed Cross Pack Version
+            avrdudeExecutable = "/usr/local/CrossPack-AVR/bin/avrdude";
+
+        } else {
+            avrdudeExecutable = "";
+        }
+
+        stringList = QStringList() << "-v" << "-pm2560"
+                                   << "-cstk500" << QString("-P/dev/cu.").append(m_settings.name)
+                                   << QString("-Uflash:w:").append(filename).append(":i");
 #endif
 
     // Start the Flashing
-    QLOG_DEBUG() << avrdudeExecutable << stringList;
-    m_burnProcess->start(avrdudeExecutable,stringList);
-    }
-    else if (m_autopilotType == "pixhawk" || m_autopilotType == "px4")
-    {
+
+        QLOG_DEBUG() << avrdudeExecutable << stringList;
+        if (avrdudeExecutable.length()>0){
+             m_burnProcess->start(avrdudeExecutable,stringList);
+             m_timeoutCounter=0;
+             m_hasError=false;
+             ui.progressBar->setValue(0);
+
+        } else {
+            // no avrdude installed, write status
+            QLOG_ERROR() << " No avrdude on the system. please install one using Brew or CrossPack-Avr";
+#ifdef Q_OS_MAC
+            ui.statusLabel->setText("Status: ERROR No avrdude installed! Please install CrossPack-AVR or use Brew");
+#else
+            ui.statusLabel->setText("Status: ERROR: No avrdude installed!");
+#endif
+        }
+
+    } else if (m_autopilotType == "pixhawk" || m_autopilotType == "px4") {
         if (m_px4uploader)
         {
             QLOG_FATAL() << "Tried to load PX4 Firmware when it was already started!";
             return;
         }
         m_isPx4 = true;
-    m_px4uploader = new PX4FirmwareUploader();
-    connect(m_px4uploader,SIGNAL(statusUpdate(QString)),this,SLOT(px4StatusUpdate(QString)));
-    connect(m_px4uploader,SIGNAL(terminated()),this,SLOT(px4Terminated()));
-    connect(m_px4uploader,SIGNAL(flashProgress(qint64,qint64)),this,SLOT(firmwareDownloadProgress(qint64,qint64)));
-    connect(m_px4uploader,SIGNAL(error(QString)),this,SLOT(px4Error(QString)));
-    connect(m_px4uploader,SIGNAL(done()),this,SLOT(px4Finished()));
-    connect(m_px4uploader,SIGNAL(requestDevicePlug()),this,SLOT(requestDeviceReplug()));
-    m_px4uploader->loadFile(m_tempFirmwareFile->fileName());
-    }
-    m_timeoutCounter=0;
-    m_hasError=false;
-    ui.progressBar->setValue(0);
+        m_px4uploader = new PX4FirmwareUploader();
+        connect(m_px4uploader,SIGNAL(statusUpdate(QString)),this,SLOT(px4StatusUpdate(QString)));
+        connect(m_px4uploader,SIGNAL(debugUpdate(QString)),this,SLOT(px4DebugUpdate(QString)));
+        connect(m_px4uploader,SIGNAL(finished()),this,SLOT(px4Terminated()));
+        connect(m_px4uploader,SIGNAL(flashProgress(qint64,qint64)),this,SLOT(firmwareDownloadProgress(qint64,qint64)));
+        connect(m_px4uploader,SIGNAL(error(QString)),this,SLOT(px4Error(QString)));
+        connect(m_px4uploader,SIGNAL(done()),this,SLOT(px4Finished()));
+        connect(m_px4uploader,SIGNAL(requestDevicePlug()),this,SLOT(requestDeviceReplug()));
+        connect(m_px4uploader,SIGNAL(devicePlugDetected()),this,SLOT(devicePlugDetected()));
+        m_px4uploader->loadFile(filename);
+        m_timeoutCounter=0;
+        m_hasError=false;
+        ui.progressBar->setValue(0);
+        }
 }
 void ApmFirmwareConfig::requestDeviceReplug()
 {
-    QMessageBox::information(this,"Warning","Please click ok, then unplug, and plug back in the PX4/Pixhawk");
+    if (m_replugRequestMessageBox)
+    {
+        m_replugRequestMessageBox->hide();
+        delete m_replugRequestMessageBox;
+        m_replugRequestMessageBox = 0;
+    }
+    m_replugRequestMessageBox = new QProgressDialog("Please unplug, and plug back in the PX4/Pixhawk","Cancel",0,30,this);
+    QProgressBar *bar = new QProgressBar(m_replugRequestMessageBox);
+    m_replugRequestMessageBox->setBar(bar);
+    bar->hide();
+    connect(m_replugRequestMessageBox,SIGNAL(canceled()),this,SLOT(cancelButtonClicked()));
+    m_replugRequestMessageBox->show();
+    m_px4UnplugTimer = new QTimer(this);
+    //connect(m_px4UnplugTimer,SIGNAL(timeout()),this,SLOT(px4UnplugTimerTick()));
+    //m_px4UnplugTimer->start(1000);
+    //QMessageBox::information(this,"Warning","Please click ok, then unplug, and plug back in the PX4/Pixhawk");
+}
+void ApmFirmwareConfig::px4UnplugTimerTick()
+{
+    m_replugRequestMessageBox->setValue(m_replugRequestMessageBox->value()+1);
+    if (m_replugRequestMessageBox->value() >= 30)
+    {
+        m_px4UnplugTimer->stop();
+        m_px4UnplugTimer->deleteLater();
+        m_px4UnplugTimer = 0;
+        m_replugRequestMessageBox->hide();
+        m_replugRequestMessageBox->deleteLater();
+        m_replugRequestMessageBox = 0;
+        cancelButtonClicked();
+
+    }
+}
+
+void ApmFirmwareConfig::devicePlugDetected()
+{
+    if (m_px4UnplugTimer)
+    {
+        m_px4UnplugTimer->stop();
+        m_px4UnplugTimer->deleteLater();
+        m_px4UnplugTimer = 0;
+    }
+    if (m_replugRequestMessageBox)
+    {
+        m_replugRequestMessageBox->hide();
+        delete m_replugRequestMessageBox;
+        m_replugRequestMessageBox = 0;
+    }
 }
 
 void ApmFirmwareConfig::firmwareProcessError(QProcess::ProcessError error)
@@ -630,36 +786,6 @@ void ApmFirmwareConfig::flashButtonClicked()
     QPushButton *senderbtn = qobject_cast<QPushButton*>(sender());
     if (m_buttonToUrlMap.contains(senderbtn))
     {
-
-        /*bool foundconnected = false;
-        for (int i=0;i<LinkManager::instance()->getLinks().size();i++)
-        {
-            if (LinkManager::instance()->getLinks()[i]->isConnected())
-            {
-                //This is likely the serial link we want.
-                SerialLink *link = qobject_cast<SerialLink*>(LinkManager::instance()->getLinks()[i]);
-                if (!link)
-                {
-                    QLOG_DEBUG() << "Eror, trying to program over a non serial link. This should not happen";
-                    return;
-                }
-                if (!(QMessageBox::question(this,tr("WARNING"),tr("You are about to upload new firmware to your board. This will disconnect you if you are currently connected. Be sure the MAV is on the ground, and connected over USB/Serial link.\n\nDo you wish to proceed?"),QMessageBox::Yes,QMessageBox::No) == QMessageBox::Yes))
-                {
-                    return;
-                }
-
-                m_detectedComPort = link->getPortName();
-                link->requestReset();
-                foundconnected = true;
-                link->disconnect();
-                link->wait(1000); // Wait 1 second for it to disconnect.
-            }
-        }
-        if (!foundconnected)
-        {
-            QMessageBox::information(0,tr("Error"),tr("You must be connected to a MAV over serial link to flash firmware. Please connect to a MAV then try again"));
-            return;
-        }*/
         //Try to connect before downloading:
         if (m_uas)
         {
@@ -679,31 +805,6 @@ void ApmFirmwareConfig::flashButtonClicked()
                 }
             }
         }
-        /*QLOG_DEBUG() << "creating new serial port" << m_settings.name;
-        m_port = new QSerialPort(this);
-        QLOG_DEBUG() << m_port;
-        m_port->setPortName(m_settings.name);
-        if (m_port->open(QIODevice::ReadWrite)) {
-            if (m_port->setBaudRate(m_settings.baudRate)
-                    && m_port->setDataBits(m_settings.dataBits)
-                    && m_port->setParity(m_settings.parity)
-                    && m_port->setStopBits(m_settings.stopBits)
-                    && m_port->setFlowControl(m_settings.flowControl)) {
-                QLOG_INFO() << "Open Firmware Upload Serial Port";
-                m_port->close();
-            } else {
-                m_port->close();
-                QMessageBox::critical(this, tr("Error"), m_port->errorString());
-                m_port->deleteLater();
-                return;
-            }
-        } else {
-            QMessageBox::critical(this, tr("Error"), m_port->errorString());
-            m_port->deleteLater();
-            return;
-        }
-        m_port->deleteLater();*/
-        ui.progressBar->setVisible(true);
 
         QLOG_DEBUG() << "Go download:" << m_buttonToUrlMap[senderbtn];
         QNetworkReply *reply = m_networkManager->get(QNetworkRequest(QUrl(m_buttonToUrlMap[senderbtn])));
@@ -714,11 +815,23 @@ void ApmFirmwareConfig::flashButtonClicked()
         connect(reply,SIGNAL(downloadProgress(qint64,qint64)),this,SLOT(firmwareDownloadProgress(qint64,qint64)));
         ui.statusLabel->setText("Downloading");
     }
+    else
+    {
+        QLOG_DEBUG() << "Flash button clicked without any HTTP links!";
+        QLOG_DEBUG() << "Autopilot:" << m_autopilotType;
+        QLOG_DEBUG() << "Firmware:" << m_firmwareType;
+        QLOG_DEBUG() << "Set COM port:" << m_settings.name;
+    }
 }
 void ApmFirmwareConfig::setLink(int index)
 {
     if (ui.linkComboBox->itemData(index).toStringList().size() > 0)
     {
+        bool blank = false;
+        if (m_settings.name == "")
+        {
+            blank = true;
+        }
         m_settings.name = ui.linkComboBox->itemData(index).toStringList()[0];
 #ifdef Q_OS_WIN
         ui.comPortNameLabel->setText(ui.linkComboBox->itemData(index).toStringList()[1] + "\n" + ui.linkComboBox->itemData(index).toStringList()[2]);
@@ -729,10 +842,10 @@ void ApmFirmwareConfig::setLink(int index)
         {
             if (info.portName() == m_settings.name)
             {
-                if (info.description().toLower().contains("mega") && info.description().contains("2650"))
+                if (info.description().toLower().contains("mega") && info.description().contains("2560"))
                 {
                     //APM
-                    if (m_autopilotType != "apm")
+                    if (m_autopilotType != "apm" || blank)
                     {
                         requestFirmwares(m_firmwareType,"apm");
                         QLOG_DEBUG() << "APM Detected";
@@ -743,15 +856,15 @@ void ApmFirmwareConfig::setLink(int index)
                     //PX4
                     if (info.productIdentifier() == 0x0010) //Both PX4 and PX4 bootloader are 0x0010.
                     {
-                        if (m_autopilotType != "px4")
+                        if (m_autopilotType != "px4" || blank)
                         {
                             requestFirmwares(m_firmwareType,"px4");
                             QLOG_DEBUG() << "PX4 Detected";
                         }
                     }
-                    else if (info.productIdentifier() == 0x0011 || info.productIdentifier() == 0x0001) //0x0011 is the Pixhawk, 0x0001 is the bootloader.
+                    else if (info.productIdentifier() == 0x0011 || info.productIdentifier() == 0x0001 || info.productIdentifier() == 0x0016) //0x0011 is the Pixhawk, 0x0001 is the bootloader.
                     {
-                        if (m_autopilotType != "pixhawk")
+                        if (m_autopilotType != "pixhawk" || blank)
                         {
                             requestFirmwares(m_firmwareType,"pixhawk");
                             QLOG_DEBUG() << "Pixhawk Detected";
@@ -809,12 +922,12 @@ void ApmFirmwareConfig::firmwareListFinished()
     if (m_firmwareType == "beta")
     {
         cmpstr = "beta";
-        labelstr = "BETA ";
+        labelstr = "BETA\n";
     }
     else if (m_firmwareType == "latest")
     {
         cmpstr = "latest";
-        labelstr = "TRUNK ";
+        labelstr = "TRUNK\n";
     }
     else
     {
@@ -869,6 +982,27 @@ void ApmFirmwareConfig::firmwareListFinished()
     }
     //QLOG_DEBUG() << "Match not found for:" << reply->url();
     //QLOG_DEBUG() << "Git version line:" <<  replystr;
+}
+
+void ApmFirmwareConfig::flashCustomFirmware()
+{
+    // Show File SelectionDialog
+
+    QString filename = QFileDialog::getOpenFileName(this, tr("Open File"),"~",
+                                                     tr("bin (*.hex *.px4)"));
+
+    if (filename.length() > 0){
+        QLOG_DEBUG() << "Selected File to flash: " << filename;
+        ui.progressBar->setEnabled(true);
+        ui.progressBar->setTextVisible(false);
+        ui.statusLabel->setText("Flashing");
+        flashFirmware(filename);
+
+    } else {
+        QLOG_DEBUG() << "custom firmware flash cancelled: ";
+        return;
+    }
+
 }
 
 ApmFirmwareConfig::~ApmFirmwareConfig()
