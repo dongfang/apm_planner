@@ -758,10 +758,14 @@ void UAS::receiveMessage(LinkInterface* link, mavlink_message_t message)
 
             // The primary altitude is the one that the UAV uses for navigation.
             // We assume! that the HUD message reports that as altitude.
-            emit primaryAltitudeChanged(this, hud.alt, time);
+            setAltitudeASL(hud.alt / 1000.0);
 
-            emit primarySpeedChanged(this, hud.airspeed, time);
-            emit gpsSpeedChanged(this, hud.groundspeed, time);
+            // emit mslAltitudeChanged(this, getAltitudeMSL(), getAltitudeRel(), time);
+            // emit airspeedChanged(this, hud.airspeed, time);
+            // emit gpsSpeedChanged(this, hud.groundspeed, time);
+            setAirspeed(hud.airspeed);
+            setGroundspeed(hud.groundspeed);
+
             emit climbRateChanged(this, hud.climb, time);
         }
             break;
@@ -819,7 +823,8 @@ void UAS::receiveMessage(LinkInterface* link, mavlink_message_t message)
             // pos.alt is GPS altitude and pos.relative_alt is above-home altitude.
             // It would be nice if APM could be modified to present the primary (mix) alt. instead
             // of the GPS alt. in this message.
-            setAltitude(pos.alt/1000.0);
+            setAltitudeASL(pos.alt/1000.0);
+            setAltitudeRel(pos.relative_alt/1000.0);
 
             globalEstimatorActive = true;
 
@@ -827,14 +832,19 @@ void UAS::receiveMessage(LinkInterface* link, mavlink_message_t message)
             speedY = pos.vy/100.0;
             speedZ = pos.vz/100.0;
 
-            emit globalPositionChanged(this, getLatitude(), getLongitude(), getAltitude(), time);
-            // dongfang: The altitude is GPS altitude. Bugger. It needs to be changed to primary.
-            emit gpsAltitudeChanged(this, getAltitude(), time);
+            emit globalPositionChanged(this, getLatitude(), getLongitude(), getAltitudeASL(), time);
+
+            //void aslAltitudeChanged(UASInterface*, double altitude, quint64 usec);
+            //void relativeAltitudeChanged(UASInterface*, double altitude, quint64 usec);
+
+            emit aslAltitudeChanged(this, getAltitudeASL(), time);
+            emit relativeAltitudeChanged(this, getAltitudeRel(), time);
+
             // We had some frame mess here, global and local axes were mixed.
             emit velocityChanged_NED(this, speedX, speedY, speedZ, time);
 
             double groundspeed = qSqrt(speedX*speedX+speedY*speedY);
-            emit gpsSpeedChanged(this, groundspeed, time);
+            emit groundspeedChanged(this, groundspeed, time);
 
             // Set internal state
             if (!positionLock)
@@ -870,7 +880,6 @@ void UAS::receiveMessage(LinkInterface* link, mavlink_message_t message)
 
             if (pos.fix_type > 2)
             {
-
                 latitude_gps = pos.lat/(double)1E7;
                 longitude_gps = pos.lon/(double)1E7;
                 altitude_gps = pos.alt/1000.0;
@@ -879,9 +888,10 @@ void UAS::receiveMessage(LinkInterface* link, mavlink_message_t message)
                 if (!globalEstimatorActive) {
                     setLatitude(latitude_gps);
                     setLongitude(longitude_gps);
-                    setAltitude(altitude_gps);
-                    emit globalPositionChanged(this, getLatitude(), getLongitude(), getAltitude(), time);
-                    emit gpsAltitudeChanged(this, getAltitude(), time);
+                    setAltitudeASL(altitude_gps);
+                    emit globalPositionChanged(this, getLatitude(), getLongitude(), getAltitudeASL(), time);
+                    //emit mslAltitudeChanged(this, altitude_gps, time);
+                    setAltitudeASL(altitude_gps);
                 }
 
                 positionLock = true;
@@ -896,9 +906,9 @@ void UAS::receiveMessage(LinkInterface* link, mavlink_message_t message)
                     if ((vel < 1000000) && !isnan(vel) && !isinf(vel))
                     {
                         //emit speedChanged(this, vel, 0.0, 0.0, time);
-                        setGroundSpeed(vel);
+                        setGroundspeed(vel);
                         // TODO: Other sources also? Actually this condition does not quite belong here.
-                        emit gpsSpeedChanged(this, vel, time);
+                        emit groundspeedChanged(this, vel, time);
                     }
                     else
                     {
