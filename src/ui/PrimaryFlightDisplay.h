@@ -18,11 +18,11 @@ public slots:
     /** @brief Attitude from one specific component / redundant autopilot */
     void updateAttitude(UASInterface* uas, int component, double roll, double pitch, double yaw, quint64 timestamp);
 
-    void updatePrimarySpeed(UASInterface* uas, double speed, quint64 timstamp);
-    void updateGPSSpeed(UASInterface* uas, double speed, quint64 timstamp);
+    void updateAirspeed(UASInterface* uas, double speed, quint64 timstamp);
+    void updateGroundspeed(UASInterface* uas, double speed, quint64 timstamp);
     void updateClimbRate(UASInterface* uas, double altitude, quint64 timestamp);
-    void updatePrimaryAltitude(UASInterface* uas, double altitude, quint64 timestamp);
-    void updateGPSAltitude(UASInterface* uas, double altitude, quint64 timestamp);
+    void updateASLAltitude(UASInterface* uas, double altitude, quint64 timestamp);
+    void updateRelativeAltitude(UASInterface* uas, double altitude, quint64 timestamp);
     void updateNavigationControllerErrors(UASInterface* uas, double altitudeError, double speedError, double xtrackError);
 
     /** @brief Set the currently monitored UAS */
@@ -125,22 +125,22 @@ private:
     SpeedMode speedMode;
     */
 
-    bool didReceivePrimaryAltitude;
-    bool didReceivePrimarySpeed;
+    //bool didReceivePrimaryAltitude;
+    //bool didReceivePrimarySpeed;
 
     float roll;
     float pitch;
     float heading;
 
-    float primaryAltitude;
-    float GPSAltitude;
+    //float primaryAltitude;
+    float aslAltitude;
 
     // APM: GPS and baro mix above home (GPS) altitude. This value comes from the GLOBAL_POSITION_INT message.
     // Do !!!NOT!!! ever do altitude calculations at the ground station. There are enough pitfalls already.
     // If the MP "set home altitude" button is migrated to here, it must set the UAS home altitude, not a GS-local one.
-    float aboveHomeAltitude;
+    float relativeAltitude;
 
-    float primarySpeed;
+    float airspeed;
     float groundspeed;
     float verticalVelocity;
 

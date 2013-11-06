@@ -423,6 +423,4 @@ void ArduPilotMegaMAV::textMessageReceived(int uasid, int componentid, int sever
         QString audioString = "Pre-arm check:" + text.remove("PreArm:");
         GAudioOutput::instance()->say(audioString, severity);
     }
-
-
 }

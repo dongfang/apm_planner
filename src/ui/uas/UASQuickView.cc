@@ -32,7 +32,7 @@ UASQuickView::UASQuickView(QWidget *parent) : QWidget(parent)
     if (uasPropertyValueMap.size() == 0)
     {
         valueEnabled("altitude");
-        valueEnabled("groundSpeed");
+        valueEnabled("groundspeed");
         valueEnabled("distToWP");
         valueEnabled("M1:ATTITUDE.pitch");
         valueEnabled("M1:ATTITUDE.roll");

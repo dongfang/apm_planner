@@ -106,23 +106,34 @@ public:
     Q_PROPERTY(double pitch READ getPitch WRITE setPitch NOTIFY pitchChanged)
     Q_PROPERTY(double yaw READ getYaw WRITE setYaw NOTIFY yawChanged)
     Q_PROPERTY(double distToWaypoint READ getDistToWaypoint WRITE setDistToWaypoint NOTIFY distToWaypointChanged)
-    Q_PROPERTY(double groundSpeed READ getGroundSpeed WRITE setGroundSpeed NOTIFY groundSpeedChanged)
+    Q_PROPERTY(double groundspeed READ getGroundspeed WRITE setGroundspeed NOTIFY groundspeedChanged)
 
-    void setGroundSpeed(double val)
+    void setGroundspeed(double val)
     {
-        groundSpeed = val;
-        emit groundSpeedChanged(val,"groundSpeed");
-        emit valueChanged(this->uasId,"groundSpeed","m/s",QVariant(val),getUnixTime());
+        groundspeed = val;
+        emit groundspeedChanged(val,"groundspeed");
+        emit valueChanged(this->uasId,"groundspeed","m/s",QVariant(val),getUnixTime());
     }
-    double getGroundSpeed() const
+    double getGroundspeed() const
     {
-        return groundSpeed;
+        return groundspeed;
     }
+
+    Q_PROPERTY(double airspeed READ getAirspeed WRITE setAirspeed NOTIFY airspeedChanged)
+    void setAirspeed(double val)
+    {
+        airspeed = val;
+        emit airspeedChanged(val,"airspeed");
+        emit valueChanged(this->uasId,"airspeed","m/s",QVariant(val),getUnixTime());
+    }
+    double getAirspeed() const
+    {
+        return airspeed;
+    }
+
     Q_PROPERTY(double bearingToWaypoint READ getBearingToWaypoint WRITE setBearingToWaypoint NOTIFY bearingToWaypointChanged)
-
-    // dongfang: There is not only one altitude; there are at least (APM) GPS altitude, mix altitude and mix-altitude relative to home.
-    // I have made this property refer to the mix-altitude ASL as this is the one actually used in navigation by APM.
-    Q_PROPERTY(double altitude READ getAltitude WRITE setAltitude NOTIFY altitudeChanged)
+    Q_PROPERTY(double altitudeASL READ getAltitudeASL WRITE setAltitudeASL NOTIFY aslAltitudeChanged)
+    Q_PROPERTY(double altitudeRel READ getAltitudeRel WRITE setAltitudeRel NOTIFY relativeAltitudeChanged)
 
     void setLocalX(double val)
     {
@@ -182,16 +193,29 @@ public:
         return longitude;
     }
 
-    void setAltitude(double val)
+    void setAltitudeASL(double val)
     {
-        altitude = val;
-        emit altitudeChanged(val, "altitude");
-        emit valueChanged(this->uasId,"altitude","M",QVariant(val),getUnixTime());
+        altitudeASL = val;
+        emit aslAltitudeChanged(val, "altitudeASL");
+        emit valueChanged(this->uasId,"altitudeASL","M",QVariant(val),getUnixTime());
     }
 
-    double getAltitude() const
+    double getAltitudeASL() const
     {
-        return altitude;
+        return altitudeASL;
+    }
+
+
+    void setAltitudeRel(double val)
+    {
+        altitudeRel = val;
+        emit relativeAltitudeChanged(val, "altitudeRel");
+        emit valueChanged(this->uasId,"altitudeRel","M",QVariant(val),getUnixTime());
+    }
+
+    double getAltitudeRel() const
+    {
+        return altitudeRel;
     }
 
     void setSatelliteCount(double val)
@@ -426,7 +450,8 @@ protected: //COMMENTS FOR TEST UNIT
 
     double latitude;            ///< Global latitude as estimated by position estimator
     double longitude;           ///< Global longitude as estimated by position estimator
-    double altitude;            ///< Global altitude as estimated by position estimator
+    double altitudeASL;         ///< Global MSL altitude as estimated by position estimator
+    double altitudeRel;         ///< Altitude relative to home as estimated by position estimator
 
     double satelliteCount;      ///< Number of satellites visible to raw GPS
     bool globalEstimatorActive; ///< Global position estimator present, do not fall back to GPS raw for position
@@ -442,7 +467,8 @@ protected: //COMMENTS FOR TEST UNIT
 
     /// WAYPOINT NAVIGATION
     double distToWaypoint;       ///< Distance to next waypoint
-    double groundSpeed;         ///< GPS Groundspeed
+    double groundspeed;          ///< GPS Groundspeed
+    double airspeed;             ///< Airspeed (UAS will report groundspeed for this if it has no sensor or estimate)
     double bearingToWaypoint;    ///< Bearing to next waypoint
     UASWaypointManager waypointManager;
 
@@ -873,18 +899,19 @@ signals:
     void localZChanged(double val,QString name);
     void longitudeChanged(double val,QString name);
     void latitudeChanged(double val,QString name);
-    void altitudeChanged(double val,QString name);
+    //void altitudeChanged(double absoluteVal, double relativeVal, QString name);
+    void aslAltitudeChanged(double val, QString name);
+    void relativeAltitudeChanged(double val, QString name);
+
     void rollChanged(double val,QString name);
     void pitchChanged(double val,QString name);
     void yawChanged(double val,QString name);
     void satelliteCountChanged(double val,QString name);
     void distToWaypointChanged(double val,QString name);
-    void groundSpeedChanged(double val, QString name);
+    void groundspeedChanged(double val, QString name);
+    void airspeedChanged(double val, QString name);
     void bearingToWaypointChanged(double val,QString name);
 
-    //void primaryAltitudeChanged(UASInterface*, double altitude, quint64 usec);
-    //void gpsAltitudeChanged(UASInterface*, double altitude, quint64 usec);
-    //void velocityChanged_NED(UASInterface*, double vx, double vy, double vz, quint64 usec);
 protected:
     /** @brief Get the UNIX timestamp in milliseconds, enter microseconds */
     quint64 getUnixTime(quint64 time=0);
