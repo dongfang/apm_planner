@@ -825,14 +825,14 @@ void QGCXPlaneLink::setRandomPosition()
     double offLon = rand() / static_cast<double>(RAND_MAX) / 500.0 + 1.0/500.0;
     double offAlt = rand() / static_cast<double>(RAND_MAX) * 200.0 + 100.0;
 
-    if (mav->getAltitude() + offAlt < 0)
+    if (mav->getAltitudeASL() + offAlt < 0)
     {
         offAlt *= -1.0;
     }
 
     setPositionAttitude(mav->getLatitude() + offLat,
                         mav->getLongitude() + offLon,
-                        mav->getAltitude() + offAlt,
+                        mav->getAltitudeASL() + offAlt,
                         mav->getRoll(),
                         mav->getPitch(),
                         mav->getYaw());
@@ -849,7 +849,7 @@ void QGCXPlaneLink::setRandomAttitude()
 
     setPositionAttitude(mav->getLatitude(),
                         mav->getLongitude(),
-                        mav->getAltitude(),
+                        mav->getAltitudeASL(),
                         roll,
                         pitch,
                         yaw);

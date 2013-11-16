@@ -516,8 +516,8 @@ signals:
     void localPositionChanged(UASInterface*, int component, double x, double y, double z, quint64 usec);
     void globalPositionChanged(UASInterface*, double lat, double lon, double alt, quint64 usec);
 
-    void aslAltitudeChanged(UASInterface*, double altitude, quint64 usec);
-    void relativeAltitudeChanged(UASInterface*, double altitude, quint64 usec);
+    void aslAltitudeChanged(UASInterface*, double altitude);
+    void relativeAltitudeChanged(UASInterface*, double altitude);
 
     //void gpsAltitudeChanged(UASInterface*, double altitude, quint64 usec);
     /** @brief Update the status of one satellite used for localization */
@@ -527,6 +527,7 @@ signals:
     void airspeedChanged(UASInterface*, double speed, quint64 usec);
     void groundspeedChanged(UASInterface*, double speed, quint64 usec);
     // The vertical speed (a scalar)
+
     void climbRateChanged(UASInterface*, double climb, quint64 usec);
     // Consider adding a MAV_FRAME parameter to this; could help specifying what the 3 scalars are.
     void velocityChanged_NED(UASInterface*, double vx, double vy, double vz, quint64 usec);

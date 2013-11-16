@@ -111,7 +111,7 @@ public:
     void setGroundspeed(double val)
     {
         groundspeed = val;
-        emit groundspeedChanged(val,"groundspeed");
+        //emit groundspeedChanged(val,"groundspeed");
         emit valueChanged(this->uasId,"groundspeed","m/s",QVariant(val),getUnixTime());
     }
     double getGroundspeed() const
@@ -123,7 +123,7 @@ public:
     void setAirspeed(double val)
     {
         airspeed = val;
-        emit airspeedChanged(val,"airspeed");
+        //emit airspeedChanged(val,"airspeed");
         emit valueChanged(this->uasId,"airspeed","m/s",QVariant(val),getUnixTime());
     }
     double getAirspeed() const
@@ -133,7 +133,7 @@ public:
 
     Q_PROPERTY(double bearingToWaypoint READ getBearingToWaypoint WRITE setBearingToWaypoint NOTIFY bearingToWaypointChanged)
     Q_PROPERTY(double altitudeASL READ getAltitudeASL WRITE setAltitudeASL NOTIFY aslAltitudeChanged)
-    Q_PROPERTY(double altitudeRel READ getAltitudeRel WRITE setAltitudeRel NOTIFY relativeAltitudeChanged)
+    Q_PROPERTY(double altitudeRel READ getAltitudeRelative WRITE setAltitudeRelative NOTIFY relativeAltitudeChanged)
 
     void setLocalX(double val)
     {
@@ -196,7 +196,8 @@ public:
     void setAltitudeASL(double val)
     {
         altitudeASL = val;
-        emit aslAltitudeChanged(val, "altitudeASL");
+        //emit aslAltitudeChanged(val, "altitudeASL");
+        emit aslAltitudeChanged(this, val, getUnixTime());
         emit valueChanged(this->uasId,"altitudeASL","M",QVariant(val),getUnixTime());
     }
 
@@ -206,14 +207,15 @@ public:
     }
 
 
-    void setAltitudeRel(double val)
+    void setAltitudeRelative(double val)
     {
         altitudeRel = val;
-        emit relativeAltitudeChanged(val, "altitudeRel");
+        //emit relativeAltitudeChanged(val, "altitudeRel");
+        emit relativeAltitudeChanged(this, val, getUnixTime());
         emit valueChanged(this->uasId,"altitudeRel","M",QVariant(val),getUnixTime());
     }
 
-    double getAltitudeRel() const
+    double getAltitudeRelative() const
     {
         return altitudeRel;
     }
@@ -450,8 +452,11 @@ protected: //COMMENTS FOR TEST UNIT
 
     double latitude;            ///< Global latitude as estimated by position estimator
     double longitude;           ///< Global longitude as estimated by position estimator
+
     double altitudeASL;         ///< Global MSL altitude as estimated by position estimator
     double altitudeRel;         ///< Altitude relative to home as estimated by position estimator
+
+    int dongfangASLHack_GLOBAL_POSITION_INT_Since_VFR_Cnt;
 
     double satelliteCount;      ///< Number of satellites visible to raw GPS
     bool globalEstimatorActive; ///< Global position estimator present, do not fall back to GPS raw for position
@@ -900,16 +905,22 @@ signals:
     void longitudeChanged(double val,QString name);
     void latitudeChanged(double val,QString name);
     //void altitudeChanged(double absoluteVal, double relativeVal, QString name);
-    void aslAltitudeChanged(double val, QString name);
-    void relativeAltitudeChanged(double val, QString name);
+
+    void aslAltitudeChanged(UASInterface*, double altitude, quint64 usec);
+    void relativeAltitudeChanged(UASInterface*, double altitude, quint64 usec);
 
     void rollChanged(double val,QString name);
     void pitchChanged(double val,QString name);
     void yawChanged(double val,QString name);
     void satelliteCountChanged(double val,QString name);
     void distToWaypointChanged(double val,QString name);
-    void groundspeedChanged(double val, QString name);
-    void airspeedChanged(double val, QString name);
+
+    //void groundspeedChanged(double val, QString name);
+    //void airspeedChanged(double val, QString name);
+
+    void airspeedChanged(UASInterface*, double speed, quint64 usec);
+    void groundspeedChanged(UASInterface*, double speed, quint64 usec);
+
     void bearingToWaypointChanged(double val,QString name);
 
 protected:

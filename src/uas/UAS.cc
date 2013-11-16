@@ -758,13 +758,15 @@ void UAS::receiveMessage(LinkInterface* link, mavlink_message_t message)
 
             // The primary altitude is the one that the UAV uses for navigation.
             // We assume! that the HUD message reports that as altitude.
-            setAltitudeASL(hud.alt / 1000.0);
+            dongfangASLHack_GLOBAL_POSITION_INT_Since_VFR_Cnt=0;
+            setAltitudeASL(hud.alt);
+            // emit aslAltitudeChanged(this, getAltitudeASL(), time);
 
-            // emit mslAltitudeChanged(this, getAltitudeMSL(), getAltitudeRel(), time);
-            // emit airspeedChanged(this, hud.airspeed, time);
-            // emit gpsSpeedChanged(this, hud.groundspeed, time);
             setAirspeed(hud.airspeed);
             setGroundspeed(hud.groundspeed);
+
+            emit airspeedChanged(this, hud.airspeed, time);
+            emit groundspeedChanged(this, hud.groundspeed, time);
 
             emit climbRateChanged(this, hud.climb, time);
         }
@@ -823,8 +825,13 @@ void UAS::receiveMessage(LinkInterface* link, mavlink_message_t message)
             // pos.alt is GPS altitude and pos.relative_alt is above-home altitude.
             // It would be nice if APM could be modified to present the primary (mix) alt. instead
             // of the GPS alt. in this message.
-            setAltitudeASL(pos.alt/1000.0);
-            setAltitudeRel(pos.relative_alt/1000.0);
+            if (dongfangASLHack_GLOBAL_POSITION_INT_Since_VFR_Cnt >= 10) {
+                setAltitudeASL(pos.alt/1000.0);
+            } else {
+                dongfangASLHack_GLOBAL_POSITION_INT_Since_VFR_Cnt++;
+            }
+
+            setAltitudeRelative(pos.relative_alt/1000.0);
 
             globalEstimatorActive = true;
 
@@ -834,11 +841,9 @@ void UAS::receiveMessage(LinkInterface* link, mavlink_message_t message)
 
             emit globalPositionChanged(this, getLatitude(), getLongitude(), getAltitudeASL(), time);
 
-            //void aslAltitudeChanged(UASInterface*, double altitude, quint64 usec);
-            //void relativeAltitudeChanged(UASInterface*, double altitude, quint64 usec);
-
-            emit aslAltitudeChanged(this, getAltitudeASL(), time);
-            emit relativeAltitudeChanged(this, getAltitudeRel(), time);
+            //NOT!! Done by above invoked setters (why not?)
+            //emit aslAltitudeChanged(this, getAltitudeASL(), time);
+            //emit relativeAltitudeChanged(this, getAltitudeRelative(), time);
 
             // We had some frame mess here, global and local axes were mixed.
             emit velocityChanged_NED(this, speedX, speedY, speedZ, time);
@@ -905,10 +910,10 @@ void UAS::receiveMessage(LinkInterface* link, mavlink_message_t message)
                 if (!globalEstimatorActive) {
                     if ((vel < 1000000) && !isnan(vel) && !isinf(vel))
                     {
-                        //emit speedChanged(this, vel, 0.0, 0.0, time);
                         setGroundspeed(vel);
-                        // TODO: Other sources also? Actually this condition does not quite belong here.
+                        //emit groundspeedChanged(this, vel, 0.0, 0.0, time);
                         emit groundspeedChanged(this, vel, time);
+                        // TODO: Other sources also? Actually this condition does not quite belong here.
                     }
                     else
                     {

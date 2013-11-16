@@ -41,7 +41,8 @@ static const float PITCH_SCALE_MINORWIDTH = 0.066;
 static const int PITCH_SCALE_WIDTHREDUCTION_FROM = 30;
 static const float PITCH_SCALE_WIDTHREDUCTION = 0.3f;
 
-static const int PITCH_SCALE_HALFRANGE = 15;
+static const int PITCH_SCALE_RANGE_UP = 20;
+static const int PITCH_SCALE_RANGE_DN = 15;
 
 // The number of degrees to either side of the heading to draw the compass disk.
 // 180 is valid, this will draw a complete disk. If the disk is partly clipped
@@ -135,9 +136,9 @@ PrimaryFlightDisplay::PrimaryFlightDisplay(int width, int height, QWidget *paren
     pitch(UNKNOWN_ATTITUDE),
     heading(UNKNOWN_ATTITUDE),
 
-    primaryAltitude(UNKNOWN_ALTITUDE),
-    GPSAltitude(UNKNOWN_ALTITUDE),
-    aboveHomeAltitude(UNKNOWN_ALTITUDE),
+    aslAltitude(UNKNOWN_ALTITUDE),
+    relativeAltitude(UNKNOWN_ALTITUDE),
+    //aboveHomeAltitude(UNKNOWN_ALTITUDE),
 
     airspeed(UNKNOWN_SPEED),
     groundspeed(UNKNOWN_SPEED),
@@ -319,11 +320,11 @@ void PrimaryFlightDisplay::setActiveUAS(UASInterface* uas)
         //connect(uas, SIGNAL(globalPositionChanged(UASInterface*,double,double,double,quint64)), this, SLOT(updateGlobalPosition(UASInterface*,double,double,double,quint64)));
         //connect(uas, SIGNAL(waypointSelected(int,int)), this,
         //        SLOT(selectWaypoint(int, int)));
-        connect(uas, SIGNAL(airpeedChanged(UASInterface*, double, quint64)), this, SLOT(updateAirspeed(UASInterface*,double,quint64)));
+        connect(uas, SIGNAL(airspeedChanged(UASInterface*, double, quint64)), this, SLOT(updateAirspeed(UASInterface*,double,quint64)));
         connect(uas, SIGNAL(groundspeedChanged(UASInterface*, double, quint64)), this, SLOT(updateGroundspeed(UASInterface*,double,quint64)));
         connect(uas, SIGNAL(climbRateChanged(UASInterface*, double, quint64)), this,
                 SLOT(updateClimbRate(UASInterface*, double, quint64)));
-        connect(uas, SIGNAL(aslAltitudeChanged(UASInterface*, double, quint64)), this, SLOT(updateAbsoluteAltitude(UASInterface*, double, quint64)));
+        connect(uas, SIGNAL(aslAltitudeChanged(UASInterface*, double, quint64)), this, SLOT(updateASLAltitude(UASInterface*, double, quint64)));
         connect(uas, SIGNAL(relativeAltitudeChanged(UASInterface*, double, quint64)), this, SLOT(updateRelativeAltitude(UASInterface*, double, quint64)));
         connect(uas, SIGNAL(navigationControllerErrorsChanged(UASInterface*, double, double, double)), this, SLOT(updateNavigationControllerErrors(UASInterface*, double, double, double)));
 
@@ -374,7 +375,7 @@ void PrimaryFlightDisplay::updateAirspeed(UASInterface* uas, double speed, quint
     //didReceiveAirspeed = true;
 }
 
-void PrimaryFlightDisplay::updateGPSSpeed(UASInterface* uas, double speed, quint64 timestamp)
+void PrimaryFlightDisplay::updateGroundspeed(UASInterface* uas, double speed, quint64 timestamp)
 {
     Q_UNUSED(uas);
     Q_UNUSED(timestamp);
@@ -693,8 +694,8 @@ void PrimaryFlightDisplay::drawPitchScale(
 
     // find the mark nearest center
     int snap = qRound((double)(displayPitch/PITCH_SCALE_RESOLUTION))*PITCH_SCALE_RESOLUTION;
-    int _min = snap-PITCH_SCALE_HALFRANGE;
-    int _max = snap+PITCH_SCALE_HALFRANGE;
+    int _min = snap-PITCH_SCALE_RANGE_DN;
+    int _max = snap+PITCH_SCALE_RANGE_UP;
     for (int degrees=_min; degrees<=_max; degrees+=PITCH_SCALE_RESOLUTION) {
         bool isMajor = degrees % (PITCH_SCALE_RESOLUTION*2) == 0;
         float linewidth =  isMajor ? PITCH_SCALE_MAJORWIDTH : PITCH_SCALE_MINORWIDTH;
@@ -1055,7 +1056,7 @@ void PrimaryFlightDisplay::drawAltimeter(
     // draw simple in-tape VVI.
     if (vv != UNKNOWN_ALTITUDE) {
     float vvPixHeight = -vv/ALTIMETER_VVI_SPAN * effectiveHalfHeight;
-    if (abs (vvPixHeight)<markerHalfHeight) return; // hidden behind marker.
+    if (abs (vvPixHeight)>markerHalfHeight) { // not hidden behind marker.
 
     float vvSign = vvPixHeight>0 ? 1 : -1; // reverse y sign
 
@@ -1076,10 +1077,11 @@ void PrimaryFlightDisplay::drawAltimeter(
     vvArrowHead = QPointF(xcenter-vvArowHeadSize, vvPixHeight - vvSign * vvArowHeadSize);
     painter.drawLine(vvArrowHead, vvArrowEnd);
     }
+    }
 
     // print secondary altitude
     if (secondaryAltitude != UNKNOWN_ALTITUDE) {
-        QRectF saBox(area.x(), area.y()-secondaryAltitudeBoxHeight, w, secondaryAltitudeBoxHeight);
+        QRectF saBox(area.x(), h-secondaryAltitudeBoxHeight, w, secondaryAltitudeBoxHeight);
         painter.resetTransform();
         painter.translate(saBox.center());
         QString s_salt;
@@ -1125,7 +1127,8 @@ void PrimaryFlightDisplay::drawVelocityMeter(
     int firstTick = ceil(start / AIRSPEED_LINEAR_RESOLUTION) * AIRSPEED_LINEAR_RESOLUTION;
     int lastTick = floor(end / AIRSPEED_LINEAR_RESOLUTION) * AIRSPEED_LINEAR_RESOLUTION;
     for (int tickSpeed = firstTick; tickSpeed <= lastTick; tickSpeed += AIRSPEED_LINEAR_RESOLUTION) {
-        pen.setColor(tickSpeed<0 ? redColor : Qt::white);
+        if (tickSpeed < 0) continue;
+        // pen.setColor(tickSpeed<0 ? redColor : Qt::white);
         painter.setPen(pen);
 
         float y = (tickSpeed-centerScaleSpeed)*effectiveHalfHeight/(AIRSPEED_LINEAR_SPAN/2);
@@ -1509,7 +1512,7 @@ void PrimaryFlightDisplay::doPaint() {
 
     painter.setClipping(hadClip);
 
-    drawAltimeter(painter, altimeterArea, primaryAltitude, GPSAltitude, verticalVelocity);
+    drawAltimeter(painter, altimeterArea, aslAltitude, relativeAltitude, verticalVelocity);
 
     drawVelocityMeter(painter, velocityMeterArea, airspeed, groundspeed);
 
