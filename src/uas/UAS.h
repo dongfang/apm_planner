@@ -110,8 +110,9 @@ public:
 
     void setGroundspeed(double val)
     {
-        groundspeed = val;
+        //groundspeed = val;
         //emit groundspeedChanged(val,"groundspeed");
+        emit groundspeedChanged(this, val, getUnixTime());
         emit valueChanged(this->uasId,"groundspeed","m/s",QVariant(val),getUnixTime());
     }
     double getGroundspeed() const
@@ -123,6 +124,7 @@ public:
     void setAirspeed(double val)
     {
         airspeed = val;
+        emit airspeedChanged(this, val, getUnixTime());
         //emit airspeedChanged(val,"airspeed");
         emit valueChanged(this->uasId,"airspeed","m/s",QVariant(val),getUnixTime());
     }
@@ -196,7 +198,6 @@ public:
     void setAltitudeASL(double val)
     {
         altitudeASL = val;
-        //emit aslAltitudeChanged(val, "altitudeASL");
         emit aslAltitudeChanged(this, val, getUnixTime());
         emit valueChanged(this->uasId,"altitudeASL","M",QVariant(val),getUnixTime());
     }
@@ -914,13 +915,8 @@ signals:
     void yawChanged(double val,QString name);
     void satelliteCountChanged(double val,QString name);
     void distToWaypointChanged(double val,QString name);
-
-    //void groundspeedChanged(double val, QString name);
-    //void airspeedChanged(double val, QString name);
-
     void airspeedChanged(UASInterface*, double speed, quint64 usec);
     void groundspeedChanged(UASInterface*, double speed, quint64 usec);
-
     void bearingToWaypointChanged(double val,QString name);
 
 protected:

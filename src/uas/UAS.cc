@@ -758,15 +758,13 @@ void UAS::receiveMessage(LinkInterface* link, mavlink_message_t message)
 
             // The primary altitude is the one that the UAV uses for navigation.
             // We assume! that the HUD message reports that as altitude.
+
             dongfangASLHack_GLOBAL_POSITION_INT_Since_VFR_Cnt=0;
             setAltitudeASL(hud.alt);
             // emit aslAltitudeChanged(this, getAltitudeASL(), time);
 
             setAirspeed(hud.airspeed);
             setGroundspeed(hud.groundspeed);
-
-            emit airspeedChanged(this, hud.airspeed, time);
-            emit groundspeedChanged(this, hud.groundspeed, time);
 
             emit climbRateChanged(this, hud.climb, time);
         }
@@ -825,6 +823,7 @@ void UAS::receiveMessage(LinkInterface* link, mavlink_message_t message)
             // pos.alt is GPS altitude and pos.relative_alt is above-home altitude.
             // It would be nice if APM could be modified to present the primary (mix) alt. instead
             // of the GPS alt. in this message.
+
             if (dongfangASLHack_GLOBAL_POSITION_INT_Since_VFR_Cnt >= 10) {
                 setAltitudeASL(pos.alt/1000.0);
             } else {
@@ -840,10 +839,6 @@ void UAS::receiveMessage(LinkInterface* link, mavlink_message_t message)
             speedZ = pos.vz/100.0;
 
             emit globalPositionChanged(this, getLatitude(), getLongitude(), getAltitudeASL(), time);
-
-            //NOT!! Done by above invoked setters (why not?)
-            //emit aslAltitudeChanged(this, getAltitudeASL(), time);
-            //emit relativeAltitudeChanged(this, getAltitudeRelative(), time);
 
             // We had some frame mess here, global and local axes were mixed.
             emit velocityChanged_NED(this, speedX, speedY, speedZ, time);
@@ -911,9 +906,6 @@ void UAS::receiveMessage(LinkInterface* link, mavlink_message_t message)
                     if ((vel < 1000000) && !isnan(vel) && !isinf(vel))
                     {
                         setGroundspeed(vel);
-                        //emit groundspeedChanged(this, vel, 0.0, 0.0, time);
-                        emit groundspeedChanged(this, vel, time);
-                        // TODO: Other sources also? Actually this condition does not quite belong here.
                     }
                     else
                     {
