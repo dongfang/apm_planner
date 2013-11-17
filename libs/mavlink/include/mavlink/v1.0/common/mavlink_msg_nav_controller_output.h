@@ -9,7 +9,7 @@ typedef struct __mavlink_nav_controller_output_t
  float alt_error; ///< Current altitude error in meters
  float aspd_error; ///< Current airspeed error in meters/second
  float xtrack_error; ///< Current crosstrack error on x-y plane in meters
- int16_t nav_bearing; ///< Current desired heading in degrees
+ int16_t nav_bearing; ///< Current desired heading in degrees (=target bearing +/- correction for xtrk)
  int16_t target_bearing; ///< Bearing to current MISSION/target in degrees
  uint16_t wp_dist; ///< Distance to active MISSION in meters
 } mavlink_nav_controller_output_t;

@@ -23,6 +23,7 @@ public slots:
     void updateClimbRate(UASInterface* uas, double altitude, quint64 timestamp);
     void updateASLAltitude(UASInterface* uas, double altitude, quint64 timestamp);
     void updateRelativeAltitude(UASInterface* uas, double altitude, quint64 timestamp);
+    void updateNavigationControllerBearings(UASInterface* uas, double targetBearing, double navigationBearing);
     void updateNavigationControllerErrors(UASInterface* uas, double altitudeError, double speedError, double xtrackError);
 
     /** @brief Set the currently monitored UAS */
@@ -94,13 +95,13 @@ private:
     void drawTextRightCenter(QPainter& painter, QString text, float fontSize, float x, float y);
     void drawTextCenterBottom(QPainter& painter, QString text, float fontSize, float x, float y);
     void drawTextCenterTop(QPainter& painter, QString text, float fontSize, float x, float y);
+    void drawMarker(QPainter& painter, int count, ...);
     void drawAIGlobalFeatures(QPainter& painter, QRectF mainArea, QRectF paintArea);
     void drawAIAirframeFixedFeatures(QPainter& painter, QRectF area);
     void drawPitchScale(QPainter& painter, QRectF area, float intrusion, bool drawNumbersLeft, bool drawNumbersRight);
     void drawRollScale(QPainter& painter, QRectF area, bool drawTicks, bool drawNumbers);
     void drawAIAttitudeScales(QPainter& painter, QRectF area, float intrusion);
     void drawAICompassDisk(QPainter& painter, QRectF area, float halfspan);
-    void drawSeparateCompassDisk(QPainter& painter, QRectF area);
 
     void drawAltimeter(QPainter& painter, QRectF area, float altitude, float secondaryAltitude, float vv);
     void drawVelocityMeter(QPainter& painter, QRectF area, float speed, float secondarySpeed);

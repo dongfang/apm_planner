@@ -532,6 +532,8 @@ signals:
     // Consider adding a MAV_FRAME parameter to this; could help specifying what the 3 scalars are.
     void velocityChanged_NED(UASInterface*, double vx, double vy, double vz, quint64 usec);
 
+    // target bearing = direct to target; navigation bearing = nav controller's output, also correcting for xtrk errors.
+    void navigationControllerBearingsChanged(UASInterface*, double targetBearing, double navigationBearing);
     void navigationControllerErrorsChanged(UASInterface*, double altitudeError, double speedError, double xtrackError);
 
     void imageStarted(int imgid, int width, int height, int depth, int channels);

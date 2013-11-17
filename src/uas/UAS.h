@@ -105,7 +105,7 @@ public:
     Q_PROPERTY(double roll READ getRoll WRITE setRoll NOTIFY rollChanged)
     Q_PROPERTY(double pitch READ getPitch WRITE setPitch NOTIFY pitchChanged)
     Q_PROPERTY(double yaw READ getYaw WRITE setYaw NOTIFY yawChanged)
-    Q_PROPERTY(double distToWaypoint READ getDistToWaypoint WRITE setDistToWaypoint NOTIFY distToWaypointChanged)
+    //Q_PROPERTY(double distToWaypoint READ getDistToWaypoint WRITE setDistToWaypoint NOTIFY distToWaypointChanged)
     Q_PROPERTY(double groundspeed READ getGroundspeed WRITE setGroundspeed NOTIFY groundspeedChanged)
 
     void setGroundspeed(double val)
@@ -133,7 +133,7 @@ public:
         return airspeed;
     }
 
-    Q_PROPERTY(double bearingToWaypoint READ getBearingToWaypoint WRITE setBearingToWaypoint NOTIFY bearingToWaypointChanged)
+    //Q_PROPERTY(double bearingToWaypoint READ getBearingToWaypoint WRITE setBearingToWaypoint NOTIFY bearingToWaypointChanged)
     Q_PROPERTY(double altitudeASL READ getAltitudeASL WRITE setAltitudeASL NOTIFY aslAltitudeChanged)
     Q_PROPERTY(double altitudeRel READ getAltitudeRelative WRITE setAltitudeRelative NOTIFY relativeAltitudeChanged)
 
@@ -243,6 +243,7 @@ public:
         return isGlobalPositionKnown;
     }
 
+    /*
     void setDistToWaypoint(double val)
     {
         distToWaypoint = val;
@@ -266,6 +267,7 @@ public:
     {
         return bearingToWaypoint;
     }
+    */
 
 
     void setRoll(double val)

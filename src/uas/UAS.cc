@@ -1446,11 +1446,9 @@ void UAS::receiveMessage(LinkInterface* link, mavlink_message_t message)
             //emit userPositionSetPointsChanged(uasId, p.x, p.y, p.z, p.yaw);
             mavlink_nav_controller_output_t p;
             mavlink_msg_nav_controller_output_decode(&message,&p);
-            setDistToWaypoint(p.wp_dist);
-            setBearingToWaypoint(p.nav_bearing);
-            //setAltitudeError(p.alt_error);
-            //setSpeedError(p.aspd_error);
-            //setCrosstrackingError(p.xtrack_error);
+            // setDistToWaypoint(p.wp_dist);
+            // setBearingToWaypoint(p.target_bearing);
+            emit navigationControllerBearingsChanged(this, p.target_bearing, p.nav_bearing);
             emit navigationControllerErrorsChanged(this, p.alt_error, p.aspd_error, p.xtrack_error);
         }
             break;
