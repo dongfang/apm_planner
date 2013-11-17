@@ -502,7 +502,6 @@ void UAS::receiveMessage(LinkInterface* link, mavlink_message_t message)
                 modechanged = true;
                 this->mode = static_cast<int>(state.base_mode);
                 shortModeText = getShortModeTextFor(this->mode);
-
                 emit modeChanged(this->getUASID(), shortModeText, "");
 
                 QString armedAudio;
@@ -1448,7 +1447,7 @@ void UAS::receiveMessage(LinkInterface* link, mavlink_message_t message)
             mavlink_msg_nav_controller_output_decode(&message,&p);
             // setDistToWaypoint(p.wp_dist);
             // setBearingToWaypoint(p.target_bearing);
-            emit navigationControllerBearingsChanged(this, p.target_bearing, p.nav_bearing);
+            emit navigationControllerTargetChanged(this, p.target_bearing, p.wp_dist);
             emit navigationControllerErrorsChanged(this, p.alt_error, p.aspd_error, p.xtrack_error);
         }
             break;

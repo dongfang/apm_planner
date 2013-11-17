@@ -23,7 +23,7 @@ public slots:
     void updateClimbRate(UASInterface* uas, double altitude, quint64 timestamp);
     void updateASLAltitude(UASInterface* uas, double altitude, quint64 timestamp);
     void updateRelativeAltitude(UASInterface* uas, double altitude, quint64 timestamp);
-    void updateNavigationControllerBearings(UASInterface* uas, double targetBearing, double navigationBearing);
+    void updateNavigationControllerTarget(UASInterface* uas, double targetBearing, double targetRange);
     void updateNavigationControllerErrors(UASInterface* uas, double altitudeError, double speedError, double xtrackError);
 
     /** @brief Set the currently monitored UAS */
@@ -95,7 +95,7 @@ private:
     void drawTextRightCenter(QPainter& painter, QString text, float fontSize, float x, float y);
     void drawTextCenterBottom(QPainter& painter, QString text, float fontSize, float x, float y);
     void drawTextCenterTop(QPainter& painter, QString text, float fontSize, float x, float y);
-    void drawMarker(QPainter& painter, int count, ...);
+    void drawMarker(QPainter& painter, Qt::PenStyle style, int count, ...);
     void drawAIGlobalFeatures(QPainter& painter, QRectF mainArea, QRectF paintArea);
     void drawAIAirframeFixedFeatures(QPainter& painter, QRectF area);
     void drawPitchScale(QPainter& painter, QRectF area, float intrusion, bool drawNumbersLeft, bool drawNumbersRight);
@@ -149,6 +149,8 @@ private:
     float navigationSpeedError;
     float navigationCrosstrackError;
     float navigationTargetBearing;
+    float navigationTargetRange;
+    int navigationTargetWP;
 
     Layout layout;      // The display layout.
     Style style;        // The AI style (tapes translucent or opague)

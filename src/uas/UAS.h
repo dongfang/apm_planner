@@ -882,6 +882,7 @@ public slots:
     void startDataRecording();
     void stopDataRecording();
     void deleteSettings();
+
 signals:
     /** @brief The main/battery voltage has changed/was updated */
     //void voltageChanged(int uasId, double voltage); // Defined in UASInterface already

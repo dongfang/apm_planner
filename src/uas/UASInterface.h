@@ -533,7 +533,7 @@ signals:
     void velocityChanged_NED(UASInterface*, double vx, double vy, double vz, quint64 usec);
 
     // target bearing = direct to target; navigation bearing = nav controller's output, also correcting for xtrk errors.
-    void navigationControllerBearingsChanged(UASInterface*, double targetBearing, double navigationBearing);
+    void navigationControllerTargetChanged(UASInterface*, double targetBearing, double targetRange);
     void navigationControllerErrorsChanged(UASInterface*, double altitudeError, double speedError, double xtrackError);
 
     void imageStarted(int imgid, int width, int height, int depth, int channels);
