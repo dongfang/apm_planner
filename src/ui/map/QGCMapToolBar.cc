@@ -1,3 +1,5 @@
+#include "UASManager.h"
+#include "ArduPilotMegaMAV.h"
 #include "QGCMapToolBar.h"
 #include "QGCMapWidget.h"
 #include "ui_QGCMapToolBar.h"
@@ -7,12 +9,12 @@ QGCMapToolBar::QGCMapToolBar(QWidget *parent) :
     ui(new Ui::QGCMapToolBar),
     map(NULL),
     optionsMenu(this),
-    mapTypesMenu(this),
     trailPlotMenu(this),
     updateTimesMenu(this),
-    mapTypesGroup(new QActionGroup(this)),
+    mapTypesMenu(this),
     trailSettingsGroup(new QActionGroup(this)),
-    updateTimesGroup(new QActionGroup(this))
+    updateTimesGroup(new QActionGroup(this)),
+    mapTypesGroup(new QActionGroup(this))
 {
     ui->setupUi(this);
 }
@@ -21,19 +23,21 @@ void QGCMapToolBar::setMap(QGCMapWidget* map)
 {
     this->map = map;
 
+    loadSettings();
+
     if (map)
     {
         connect(ui->goToButton, SIGNAL(clicked()), map, SLOT(showGoToDialog()));
-        connect(ui->goHomeButton, SIGNAL(clicked()), map, SLOT(goHome()));
-        connect(ui->lastPosButton, SIGNAL(clicked()), map, SLOT(loadSettings()));
+        connect(ui->goHomeButton, SIGNAL(clicked()), this, SLOT(goHome()));
+        connect(ui->lastPosButton, SIGNAL(clicked()), map, SLOT(lastPosition()));
         connect(ui->clearTrailsButton, SIGNAL(clicked()), map, SLOT(deleteTrails()));
         connect(map, SIGNAL(OnTileLoadStart()), this, SLOT(tileLoadStart()));
         connect(map, SIGNAL(OnTileLoadComplete()), this, SLOT(tileLoadEnd()));
         connect(map, SIGNAL(OnTilesStillToLoad(int)), this, SLOT(tileLoadProgress(int)));
         connect(ui->ripMapButton, SIGNAL(clicked()), map, SLOT(cacheVisibleRegion()));
 
-        ui->followCheckBox->setChecked(map->getFollowUAVEnabled());
-        connect(ui->followCheckBox, SIGNAL(clicked(bool)), map, SLOT(setFollowUAVEnabled(bool)));
+        map->setFollowUAVEnabled(ui->followPushButton->isChecked());
+        connect(ui->followPushButton, SIGNAL(clicked(bool)), map, SLOT(setFollowUAVEnabled(bool)));
 
         // Edit mode handling
         ui->editButton->hide();
@@ -57,21 +61,26 @@ void QGCMapToolBar::setMap(QGCMapWidget* map)
 
         //setup the mapTypesMenu
         QAction* action;
+        MapType::Types mapType = map->GetMapType();
+
         action =  mapTypesMenu.addAction(tr("Bing Hybrid"),this,SLOT(setMapType()));
         action->setData(MapType::BingHybrid);
         action->setCheckable(true);
         mapTypesGroup->addAction(action);
+        if(mapType == MapType::BingHybrid) action->setChecked(true);
 
         action =  mapTypesMenu.addAction(tr("Google Hybrid"),this,SLOT(setMapType()));
         action->setData(MapType::GoogleHybrid);
         action->setCheckable(true);
         mapTypesGroup->addAction(action);
+        if(mapType == MapType::GoogleHybrid) action->setChecked(true);
 
         action =  mapTypesMenu.addAction(tr("OpenStreetMap"),this,SLOT(setMapType()));
         action->setData(MapType::OpenStreetMap);
         action->setCheckable(true);
         mapTypesGroup->addAction(action);
-        //TODO check current item
+        if(mapType == MapType::OpenStreetMap) action->setChecked(true);
+
         optionsMenu.addMenu(&mapTypesMenu);
 
 
@@ -241,9 +250,44 @@ void QGCMapToolBar::tileLoadProgress(int progress)
     }
 }
 
+void QGCMapToolBar::goHome()
+{
+    UASManager *umanager = UASManager::instance();
+    if (umanager){
+        ArduPilotMegaMAV* apmUas= dynamic_cast<ArduPilotMegaMAV*>(umanager->getActiveUAS());
+        if (apmUas){
+            UASWaypointManager* wpManager = apmUas->getWaypointManager();
+            const Waypoint* homeWp = wpManager->getWaypoint(0); // Waypoint 0 is home in APM
+            if (homeWp){
+                map->updateHomePosition(homeWp->getLatitude(), homeWp->getLongitude(), homeWp->getAltitude());
+                map->goHome();
+            }
+        } else {
+            map->goHome();
+        }
+    }
+}
+
+void QGCMapToolBar::loadSettings()
+{
+    QSettings settings;
+    settings.beginGroup("QGC_MAPTOOL");
+    bool follow = settings.value("FOLLOW_UAV", false).toBool();
+    ui->followPushButton->setChecked(follow);
+}
+
+void QGCMapToolBar::storeSettings()
+{
+    QSettings settings;
+    settings.beginGroup("QGC_MAPTOOL");
+    settings.setValue("FOLLOW_UAV", ui->followPushButton->isChecked());
+    settings.endGroup();
+    settings.sync();
+}
 
 QGCMapToolBar::~QGCMapToolBar()
 {
+    storeSettings();
     delete ui;
     delete trailSettingsGroup;
     delete updateTimesGroup;

@@ -30,6 +30,9 @@ This file is part of the QGROUNDCONTROL project
 
 #ifndef _MAINWINDOW_H_
 #define _MAINWINDOW_H_
+
+#include "AutoUpdateCheck.h"
+#include "AutoUpdateDialog.h"
 #include <QtGui/QMainWindow>
 #include <QStatusBar>
 #include <QStackedWidget>
@@ -112,31 +115,20 @@ public:
     };
 
     /** @brief Get current visual style */
-    int getStyle()
-    {
-        return currentStyle;
-    }
+    int getStyle();
     /** @brief Get auto link reconnect setting */
-    bool autoReconnectEnabled()
-    {
-        return autoReconnect;
-    }
-
+    bool autoReconnectEnabled();
     /** @brief Get title bar mode setting */
-    bool dockWidgetTitleBarsEnabled()
-    {
-        return dockWidgetTitleBarEnabled;
-    }
-
+    bool dockWidgetTitleBarsEnabled();
     /** @brief Get low power mode setting */
-    bool lowPowerModeEnabled()
-    {
-        return lowPowerMode;
-    }
+    bool lowPowerModeEnabled();
 
     QList<QAction*> listLinkMenuActions(void);
 
 public slots:
+    void loadTlogMenuClicked();
+    void disableTLogReplayBar();
+    void enableTLogReplayBar();
     /** @brief Shows a status message on the bottom status bar */
     void showStatusMessage(const QString& status, int timeout);
     /** @brief Shows a status message on the bottom status bar */
@@ -148,11 +140,15 @@ public slots:
 
     /** @brief Show the application settings */
     void showSettings();
+    /** @brief Show the application About box */
+    void showAbout();
     /** @brief Add a communication link */
     LinkInterface* addLink();
     void addLink(LinkInterface* link);
     bool configLink(LinkInterface *link);
     void configure();
+    /** @brief Simulate a link */
+    void simulateLink(bool simulate);
     /** @brief Set the currently controlled UAS */
     void setActiveUAS(UASInterface* uas);
 
@@ -167,7 +163,7 @@ public slots:
     void saveScreen();
 
     /** @brief Sets advanced mode, allowing for editing of tool widget locations */
-    void setAdvancedMode();
+    void setAdvancedMode(bool mode);
     /** @brief Load configuration views */
     void loadHardwareConfigView();
     void loadSoftwareConfigView();
@@ -465,6 +461,10 @@ protected:
     QPointer<QGCFlightGearLink> fgLink;
     QTimer windowNameUpdateTimer;
 
+private slots:
+    void showAutoUpdateDownloadDialog(QString version, QString releaseType, QString url, QString name);
+    void autoUpdateCancelled(QString version);
+
 private:
     QList<QObject*> commsWidgetList;
     QMap<QString,QString> customWidgetNameToFilenameMap;
@@ -477,6 +477,9 @@ private:
 
     QString getWindowStateKey();
     QString getWindowGeometryKey();
+
+    AutoUpdateCheck m_autoUpdateCheck;
+    AutoUpdateDialog* m_dialog;
 
 };
 

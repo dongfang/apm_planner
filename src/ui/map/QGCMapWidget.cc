@@ -12,7 +12,7 @@ QGCMapWidget::QGCMapWidget(QWidget *parent) :
     mapcontrol::OPMapWidget(parent),
     firingWaypointChange(NULL),
     maxUpdateInterval(2.1f), // 2 seconds
-    followUAVEnabled(true),
+    followUAVEnabled(false),
     trailType(mapcontrol::UAVTrailType::ByTimeElapsed),
     trailInterval(2.0f),
     followUAVID(0),
@@ -30,13 +30,10 @@ QGCMapWidget::QGCMapWidget(QWidget *parent) :
     // Widget is inactive until shown
     defaultGuidedRelativeAlt = 100.0; // Default set to 100m
     defaultGuidedAltFirstTimeSet = false;
-    loadSettings(false);
+    loadSettings();
 
     //handy for debugging:
     //this->SetShowTileGridLines(true);
-
-    //default appears to be Google Hybrid, and is broken currently
-    this->SetMapType(MapType::BingHybrid);
 
     this->setContextMenuPolicy(Qt::ActionsContextMenu);
 
@@ -206,6 +203,7 @@ void QGCMapWidget::showEvent(QShowEvent* event)
 {
     // Disable OP's standard UAV, we have more than one
     SetShowUAV(false);
+    loadSettings();
 
     // Pass on to parent widget
     OPMapWidget::showEvent(event);
@@ -219,11 +217,11 @@ void QGCMapWidget::showEvent(QShowEvent* event)
         addUAS(uas);
     }
 
+    internals::PointLatLng pos_lat_lon = internals::PointLatLng(m_lastLat, m_lastLon);
 
     if (!mapInitialized)
     {
-        internals::PointLatLng pos_lat_lon = internals::PointLatLng(0, 0);
-
+        //this->SetUseOpenGL(true);
         SetMouseWheelZoomType(internals::MouseWheelZoomType::MousePositionWithoutCenter);	    // set how the mouse wheel zoom functions
         SetFollowMouse(true);				    // we want a contiuous mouse position reading
 
@@ -244,14 +242,13 @@ void QGCMapWidget::showEvent(QShowEvent* event)
         // Connect map updates to the adapter slots
         connect(this, SIGNAL(WPValuesChanged(WayPointItem*)), this, SLOT(handleMapWaypointEdit(WayPointItem*)));
 
-        SetCurrentPosition(pos_lat_lon);         // set the map position
-        setFocus();
-
         // Start timer
         connect(&updateTimer, SIGNAL(timeout()), this, SLOT(updateGlobalPosition()));
         mapInitialized = true;
         //QTimer::singleShot(800, this, SLOT(loadSettings()));
     }
+    SetCurrentPosition(pos_lat_lon);         // set the map position
+    setFocus();
     updateTimer.start(maxUpdateInterval*1000);
     // Update all UAV positions
     updateGlobalPosition();
@@ -267,21 +264,16 @@ void QGCMapWidget::hideEvent(QHideEvent* event)
 /**
  * @param changePosition Load also the last position from settings and update the map position.
  */
-void QGCMapWidget::loadSettings(bool changePosition)
+void QGCMapWidget::loadSettings()
 {
-    // Atlantic Ocean near Africa, coordinate origin
-    double lastZoom = 1;
-    double lastLat = 0;
-    double lastLon = 0;
-
     QSettings settings;
     settings.beginGroup("QGC_MAPWIDGET");
-    if (changePosition)
-    {
-        lastLat = settings.value("LAST_LATITUDE", lastLat).toDouble();
-        lastLon = settings.value("LAST_LONGITUDE", lastLon).toDouble();
-        lastZoom = settings.value("LAST_ZOOM", lastZoom).toDouble();
-    }
+    m_lastLat = settings.value("LAST_LATITUDE", 0.0f).toDouble();
+    m_lastLon = settings.value("LAST_LONGITUDE", 0.0f).toDouble();
+    m_lastZoom = settings.value("LAST_ZOOM", 1.0f).toDouble();
+
+    SetMapType(static_cast<MapType::Types>(settings.value("MAP_TYPE", MapType::BingHybrid).toInt()));
+
     trailType = static_cast<mapcontrol::UAVTrailType::Types>(settings.value("TRAIL_TYPE", trailType).toInt());
     trailInterval = settings.value("TRAIL_INTERVAL", trailInterval).toFloat();
     settings.endGroup();
@@ -319,9 +311,9 @@ void QGCMapWidget::loadSettings(bool changePosition)
     }
 
     // SET INITIAL POSITION AND ZOOM
-    internals::PointLatLng pos_lat_lon = internals::PointLatLng(lastLat, lastLon);
+    internals::PointLatLng pos_lat_lon = internals::PointLatLng(m_lastLat, m_lastLon);
     SetCurrentPosition(pos_lat_lon);        // set the map position
-    SetZoom(lastZoom); // set map zoom level
+    SetZoom(m_lastZoom); // set map zoom level
 }
 
 void QGCMapWidget::storeSettings()
@@ -329,11 +321,14 @@ void QGCMapWidget::storeSettings()
     QSettings settings;
     settings.beginGroup("QGC_MAPWIDGET");
     internals::PointLatLng pos = CurrentPosition();
-    settings.setValue("LAST_LATITUDE", pos.Lat());
-    settings.setValue("LAST_LONGITUDE", pos.Lng());
+    if ((pos.Lat() != 0.0f)&&(pos.Lng()!=0.0f)){
+        settings.setValue("LAST_LATITUDE", pos.Lat());
+        settings.setValue("LAST_LONGITUDE", pos.Lng());
+    }
     settings.setValue("LAST_ZOOM", ZoomReal());
     settings.setValue("TRAIL_TYPE", static_cast<int>(trailType));
     settings.setValue("TRAIL_INTERVAL", trailInterval);
+    settings.setValue("MAP_TYPE", static_cast<int>(GetMapType()));
     settings.endGroup();
     settings.sync();
 }
@@ -350,8 +345,6 @@ void QGCMapWidget::mouseDoubleClickEvent(QMouseEvent* event)
         //            wp->setFrame(MAV_FRAME_GLOBAL_RELATIVE_ALT);
         wp->setLatitude(pos.Lat());
         wp->setLongitude(pos.Lng());
-        wp->setFrame((MAV_FRAME)currWPManager->getFrameRecommendation());
-        wp->setAltitude(currWPManager->getAltitudeRecommendation());
         //            wp->blockSignals(false);
         //            currWPManager->notifyOfChangeEditable(wp);
     }
@@ -399,7 +392,6 @@ void QGCMapWidget::activeUASSet(UASInterface* uas)
     updateSelectedSystem(uas->getUASID());
     followUAVID = uas->getUASID();
     updateWaypointList(uas->getUASID());
-    SetZoom(15); // zoom map to newly aquired activeUAS
 
     // Connect the waypoint manager / data storage to the UI
     connect(currWPManager, SIGNAL(waypointEditableListChanged(int)), this, SLOT(updateWaypointList(int)));
@@ -449,11 +441,29 @@ void QGCMapWidget::updateGlobalPosition(UASInterface* uas, double lat, double lo
         // Set new lat/lon position of UAV icon
         internals::PointLatLng pos_lat_lon = internals::PointLatLng(lat, lon);
         uav->SetUAVPos(pos_lat_lon, alt);
+
+        if(this->uas == uas){
+            // save the last know postion
+            m_lastLat = uas->getLatitude();
+            m_lastLon = uas->getLongitude();
+        }
+
         // Follow status
-        if (followUAVEnabled && uas->getUASID() == followUAVID) SetCurrentPosition(pos_lat_lon);
+        if (followUAVEnabled && (uas->getUASID() == followUAVID) && isValidGpsLocation(uas)){
+            SetCurrentPosition(pos_lat_lon);
+        }
         // Convert from radians to degrees and apply
         uav->SetUAVHeading((uas->getYaw()/M_PI)*180.0f);
     }
+}
+
+bool QGCMapWidget::isValidGpsLocation(UASInterface* system) const
+{
+    if ((system->getLatitude() == 0.0f)
+            ||(system->getLongitude() == 0.0f)){
+        return false;
+    }
+    return true;
 }
 
 /**
@@ -472,16 +482,18 @@ void QGCMapWidget::updateGlobalPosition()
             MAV2DIcon* newUAV = new MAV2DIcon(map, this, system);
             AddUAV(system->getUASID(), newUAV);
             uav = newUAV;
-            uav->SetTrailTime(1);
-            uav->SetTrailDistance(5);
+            uav->SetTrailTime(1);       // [TODO] This should be based on a user setting
+            uav->SetTrailDistance(5);    // [TODO] This should be based on a user setting
             uav->SetTrailType(mapcontrol::UAVTrailType::ByTimeElapsed);
         }
 
         // Set new lat/lon position of UAV icon
         internals::PointLatLng pos_lat_lon = internals::PointLatLng(system->getLatitude(), system->getLongitude());
-        uav->SetUAVPos(pos_lat_lon, system->getAltitude());
+        uav->SetUAVPos(pos_lat_lon, system->getAltitudeAMSL());
         // Follow status
-        if (followUAVEnabled && system->getUASID() == followUAVID) SetCurrentPosition(pos_lat_lon);
+        if (followUAVEnabled && (system->getUASID() == followUAVID) && isValidGpsLocation(system)) {
+            SetCurrentPosition(pos_lat_lon);
+        }
         // Convert from radians to degrees and apply
         uav->SetUAVHeading((system->getYaw()/M_PI)*180.0f);
     }
@@ -507,9 +519,11 @@ void QGCMapWidget::updateLocalPosition()
 
         // Set new lat/lon position of UAV icon
         internals::PointLatLng pos_lat_lon = internals::PointLatLng(system->getLatitude(), system->getLongitude());
-        uav->SetUAVPos(pos_lat_lon, system->getAltitude());
+        uav->SetUAVPos(pos_lat_lon, system->getAltitudeAMSL());
         // Follow status
-        if (followUAVEnabled && system->getUASID() == followUAVID) SetCurrentPosition(pos_lat_lon);
+        if (followUAVEnabled && (system->getUASID() == followUAVID) && isValidGpsLocation(system)) {
+            SetCurrentPosition(pos_lat_lon);
+        }
         // Convert from radians to degrees and apply
         uav->SetUAVHeading((system->getYaw()/M_PI)*180.0f);
     }
@@ -592,6 +606,13 @@ void QGCMapWidget::goHome()
 {
     SetCurrentPosition(Home->Coord());
     SetZoom(18); //zoom to "large RC park" size
+}
+
+void QGCMapWidget::lastPosition()
+{
+    internals::PointLatLng pos_lat_lon = internals::PointLatLng(m_lastLat, m_lastLon);
+    SetCurrentPosition(pos_lat_lon);
+    SetZoom(m_lastZoom); //zoom to "large RC park" size
 }
 
 /**
@@ -836,7 +857,7 @@ void QGCMapWidget::updateWaypointList(int uas)
         // Update all potentially new waypoints
         foreach (Waypoint* wp, wps)
         {
-            QLOG_DEBUG() << "UPDATING NEW WP" << wp->getId();
+            QLOG_TRACE() << "UPDATING NEW WP" << wp->getId();
             // Update / add only if new
             if (!waypointsToIcons.contains(wp)) updateWaypoint(uas, wp);
         }

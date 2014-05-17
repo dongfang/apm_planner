@@ -41,6 +41,7 @@ This file is part of the APM_PLANNER project
 #include <QWidget>
 #include <qserialport.h>
 #include <QPointer>
+#include <UASInterface.h>
 
 namespace Ui {
 class TerminalConsole;
@@ -50,6 +51,7 @@ class Console;
 class SettingsDialog;
 class QStatusBar;
 class QComboBox;
+class LogConsole;
 
 class TerminalConsole : public QWidget
 {
@@ -59,15 +61,26 @@ public:
     explicit TerminalConsole(QWidget *parent = 0);
     ~TerminalConsole();
 
-private slots:
+public slots:
     void openSerialPort();
     void openSerialPort(const SerialSettings &settings);
     void closeSerialPort();
     void writeData(const QByteArray &data);
     void readData();
     void sendResetCommand();
+    void logsButtonClicked();
+    void logConsoleShown();
+    void logConsoleHidden();
+    void logConsoleStatusMessage(QString);
+    void logConsoleActivityStart();
+    void logConsoleActivityStop();
+    void logToKmlClicked();
 
     void handleError(QSerialPort::SerialPortError error);
+
+    void activeUASSet(UASInterface *uas);
+    void uasConnected();
+    void uasDisconnected();
 
 private slots:
     void setBaudRate(int index);
@@ -95,7 +108,10 @@ private:
     QPointer<SettingsDialog> m_settingsDialog;
     QPointer<QSerialPort> m_serial;
     SerialSettings m_settings;
-    QPointer<QTimer> m_timer;
+    QTimer m_timer;
+    QPointer<LogConsole> m_logConsole;
+    QPointer<UASInterface> m_uas;
+    bool m_windowVisible;
 };
 
 #endif // TERMINALCONSOLE_H

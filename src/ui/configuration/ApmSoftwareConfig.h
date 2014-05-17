@@ -61,6 +61,7 @@ public slots:
     void parameterChanged(int uas, int component, int parameterCount, int parameterId, QString parameterName, QVariant value);
     void writeParameter(int component, QString parameterName, QVariant value);
     void readParameter(int component, QString parameterName, QVariant value);
+    void advModeChanged(bool state);
 
 private slots:
     void activateStackedWidget();
@@ -68,7 +69,30 @@ private slots:
     void uasConnected();
     void uasDisconnected();
     void apmParamNetworkReplyFinished();
+    void populateTimerTick();
 private:
+
+    //Parameter from XML
+    class ParamConfig
+    {
+    public:
+        QString name;
+        QString docs;
+        QString param;
+        double min;
+        double max;
+        double increment;
+        QList<QPair<int,QString> > valuelist;
+        bool isAdvanced;
+        bool isRange;
+    };
+
+    //List of parameters from XML file, to be loaded on a timer
+    QList<ParamConfig> m_paramConfigList;
+
+    //Parameter loading timer
+    QTimer m_populateTimer;
+
     QString m_apmPdefFilename;
     UASInterface *m_uas;
     Ui::ApmSoftwareConfig ui;
@@ -87,6 +111,8 @@ private:
     ParamReadWriteState m_paramDownloadState;
     int m_paramDownloadCount;
     int m_paramTotalCount;
+
+    bool m_isAdvancedMode;
 };
 
 #endif // APMSOFTWARECONFIG_H

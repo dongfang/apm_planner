@@ -7,31 +7,40 @@
     <x>0</x>
     <y>0</y>
     <width>417</width>
-    <height>376</height>
+    <height>315</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Form</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
-   <property name="margin">
+   <property name="leftMargin">
+    <number>6</number>
+   </property>
+   <property name="topMargin">
+    <number>6</number>
+   </property>
+   <property name="rightMargin">
+    <number>6</number>
+   </property>
+   <property name="bottomMargin">
     <number>6</number>
    </property>
    <item>
     <widget class="QGroupBox" name="missionGroupBox">
      <property name="enabled">
-      <bool>false</bool>
+      <bool>true</bool>
      </property>
      <property name="minimumSize">
       <size>
        <width>0</width>
-       <height>150</height>
+       <height>112</height>
       </size>
      </property>
      <property name="maximumSize">
       <size>
        <width>16777215</width>
-       <height>150</height>
+       <height>125</height>
       </size>
      </property>
      <property name="title">
@@ -45,6 +54,12 @@
         </property>
         <item row="0" column="2">
          <widget class="QPushButton" name="restartMissionButton">
+          <property name="minimumSize">
+           <size>
+            <width>0</width>
+            <height>14</height>
+           </size>
+          </property>
           <property name="text">
            <string>Restart Mission</string>
           </property>
@@ -65,6 +80,12 @@
         </item>
         <item row="1" column="2">
          <widget class="QPushButton" name="goToWaypointButton">
+          <property name="minimumSize">
+           <size>
+            <width>0</width>
+            <height>14</height>
+           </size>
+          </property>
           <property name="text">
            <string>Go To Waypoint</string>
           </property>
@@ -88,6 +109,12 @@
         </item>
         <item row="2" column="2">
          <widget class="QPushButton" name="changeAltitudeButton">
+          <property name="minimumSize">
+           <size>
+            <width>0</width>
+            <height>14</height>
+           </size>
+          </property>
           <property name="text">
            <string>Change Altitude</string>
           </property>
@@ -105,6 +132,12 @@
         </item>
         <item row="3" column="2">
          <widget class="QPushButton" name="changeSpeedButton">
+          <property name="minimumSize">
+           <size>
+            <width>0</width>
+            <height>14</height>
+           </size>
+          </property>
           <property name="text">
            <string>Change Speed</string>
           </property>
@@ -118,7 +151,7 @@
    <item>
     <widget class="QGroupBox" name="actionsGroupBox">
      <property name="enabled">
-      <bool>false</bool>
+      <bool>true</bool>
      </property>
      <property name="sizePolicy">
       <sizepolicy hsizetype="Preferred" vsizetype="Minimum">
@@ -129,20 +162,29 @@
      <property name="minimumSize">
       <size>
        <width>0</width>
-       <height>125</height>
+       <height>95</height>
       </size>
      </property>
      <property name="maximumSize">
       <size>
        <width>16777215</width>
-       <height>125</height>
+       <height>100</height>
       </size>
      </property>
      <property name="title">
       <string>Actions</string>
      </property>
      <layout class="QGridLayout" name="gridLayout_2">
-      <property name="margin">
+      <property name="leftMargin">
+       <number>6</number>
+      </property>
+      <property name="topMargin">
+       <number>6</number>
+      </property>
+      <property name="rightMargin">
+       <number>6</number>
+      </property>
+      <property name="bottomMargin">
        <number>6</number>
       </property>
       <item row="2" column="2" colspan="2">
@@ -239,12 +281,12 @@
    <item>
     <widget class="QGroupBox" name="shortcutGroupBox">
      <property name="enabled">
-      <bool>false</bool>
+      <bool>true</bool>
      </property>
      <property name="minimumSize">
       <size>
        <width>0</width>
-       <height>96</height>
+       <height>82</height>
       </size>
      </property>
      <property name="maximumSize">
@@ -262,7 +304,7 @@
         <property name="minimumSize">
          <size>
           <width>75</width>
-          <height>30</height>
+          <height>22</height>
          </size>
         </property>
         <property name="maximumSize">
@@ -272,21 +314,10 @@
          </size>
         </property>
         <property name="styleSheet">
-         <string notr="true">QPushButton {
-	border: 2px solid #4A4A4F;
-	border-radius: 5px;
-	padding-left: 10px;
-	padding-right: 10px;
-	background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #C3C2C8, stop: 1 #828288);
+         <string notr="true">QPushButton:pressed {
+	background-color: rgb(100, 216, 100);
 }
-
-QPushButton:checked {
-	background-color: rgb(0,255,0);
-}
-
-QPushButton:pressed {
-	background-color: rgb(0,255,0);
-}</string>
+</string>
         </property>
         <property name="text">
          <string>Auto</string>
@@ -304,7 +335,7 @@ QPushButton:pressed {
         <property name="minimumSize">
          <size>
           <width>75</width>
-          <height>30</height>
+          <height>22</height>
          </size>
         </property>
         <property name="maximumSize">
@@ -314,21 +345,10 @@ QPushButton:pressed {
          </size>
         </property>
         <property name="styleSheet">
-         <string notr="true">QPushButton {
-	border: 2px solid #4A4A4F;
-	border-radius: 5px;
-	padding-left: 10px;
-	padding-right: 10px;
-	background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #C3C2C8, stop: 1 #828288);
+         <string notr="true">QPushButton:pressed {
+	background-color: rgb(100, 216, 100);
 }
-
-QPushButton:checked {
-	background-color: rgb(0,255,0);
-}
-
-QPushButton:pressed {
-	background-color: rgb(0,255,0);
-}</string>
+</string>
         </property>
         <property name="text">
          <string>Stabilize</string>
@@ -346,39 +366,21 @@ QPushButton:pressed {
         <property name="minimumSize">
          <size>
           <width>75</width>
-          <height>30</height>
+          <height>22</height>
          </size>
         </property>
         <property name="maximumSize">
          <size>
           <width>75</width>
-          <height>16777215</height>
+          <height>30</height>
          </size>
         </property>
         <property name="styleSheet">
-         <string notr="true">QPushButton {
-	border: 2px solid #4A4A4F;
-	border-radius: 5px;
-	padding-left: 10px;
-	padding-right: 10px;
-	background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #C3C2C8, stop: 1 #828288);
+         <string notr="true">QPushButton:pressed {
+	background-color: rgb(100, 216, 100);
 }
 
-QPushButton:checked {
-	background-color: rgb(0,255,0);
-}
 
-QPushButton:pressed {
-	background-color: rgb(0,255,0);
-}
-
-QPushButton:checked {
-	background-color: rgb(0,255,0);
-}
-
-QPushButton:pressed {
-	background-color: rgb(0,255,0);
-}
 </string>
         </property>
         <property name="text">
@@ -397,7 +399,7 @@ QPushButton:pressed {
         <property name="minimumSize">
          <size>
           <width>75</width>
-          <height>30</height>
+          <height>22</height>
          </size>
         </property>
         <property name="maximumSize">
@@ -407,20 +409,8 @@ QPushButton:pressed {
          </size>
         </property>
         <property name="styleSheet">
-         <string notr="true">QPushButton {
-	border: 2px solid #4A4A4F;
-	border-radius: 5px;
-	padding-left: 10px;
-	padding-right: 10px;
-	background-color: qlineargradient(spread:pad, x1:0.507813, y1:1, x2:0.517, y2:0, stop:0 rgba(255, 0, 0, 255), stop:1 rgba(203, 205, 205, 124))
-}
-
-QPushButton:checked {
-	background-color: rgb(0,255,0);
-}
-
-QPushButton:pressed {
-	background-color: rgb(0,255,0);
+         <string notr="true">QPushButton:pressed {
+	background-color: rgb(100, 216, 100);
 }
 
 </string>
@@ -441,7 +431,7 @@ QPushButton:pressed {
         <property name="minimumSize">
          <size>
           <width>75</width>
-          <height>30</height>
+          <height>22</height>
          </size>
         </property>
         <property name="maximumSize">
@@ -451,20 +441,8 @@ QPushButton:pressed {
          </size>
         </property>
         <property name="styleSheet">
-         <string notr="true">QPushButton {
-	border: 2px solid #4A4A4F;
-	border-radius: 5px;
-	padding-left: 10px;
-	padding-right: 10px;
-	background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #C3C2C8, stop: 1 #828288);
-}
-
-QPushButton:checked {
-	background-color: rgb(0,255,0);
-}
-
-QPushButton:pressed {
-	background-color: rgb(0,255,0);
+         <string notr="true">QPushButton:pressed {
+	background-color: rgb(100, 216, 100);
 }
 </string>
         </property>
@@ -484,7 +462,7 @@ QPushButton:pressed {
         <property name="minimumSize">
          <size>
           <width>75</width>
-          <height>30</height>
+          <height>22</height>
          </size>
         </property>
         <property name="maximumSize">
@@ -494,22 +472,9 @@ QPushButton:pressed {
          </size>
         </property>
         <property name="styleSheet">
-         <string notr="true">QPushButton {
-	border: 2px solid #4A4A4F;
-	border-radius: 5px;
-	padding-left: 10px;
-	padding-right: 10px;
-	background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #C3C2C8, stop: 1 #828288);
-}
-
-QPushButton:checked {
-	background-color: rgb(0,255,0);
-}
-
-QPushButton:pressed {
-	background-color: rgb(0,255,0);
-}
-</string>
+         <string notr="true">QPushButton:pressed {
+	background-color: rgb(100, 216, 100);
+}</string>
         </property>
         <property name="text">
          <string>...</string>
@@ -527,7 +492,7 @@ QPushButton:pressed {
         <property name="minimumSize">
          <size>
           <width>75</width>
-          <height>30</height>
+          <height>22</height>
          </size>
         </property>
         <property name="maximumSize">
@@ -537,20 +502,8 @@ QPushButton:pressed {
          </size>
         </property>
         <property name="styleSheet">
-         <string notr="true">QPushButton {
-	border: 2px solid #4A4A4F;
-	border-radius: 5px;
-	padding-left: 10px;
-	padding-right: 10px;
-	background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #C3C2C8, stop: 1 #828288);
-}
-
-QPushButton:checked {
-	background-color: rgb(0,255,0);
-}
-
-QPushButton:pressed {
-	background-color: rgb(0,255,0);
+         <string notr="true">QPushButton:pressed {
+	background-color: rgb(100, 216, 100);
 }
 </string>
         </property>
@@ -570,7 +523,7 @@ QPushButton:pressed {
         <property name="minimumSize">
          <size>
           <width>75</width>
-          <height>30</height>
+          <height>22</height>
          </size>
         </property>
         <property name="maximumSize">
@@ -580,20 +533,8 @@ QPushButton:pressed {
          </size>
         </property>
         <property name="styleSheet">
-         <string notr="true">QPushButton {
-	border: 2px solid #4A4A4F;
-	border-radius: 5px;
-	padding-left: 10px;
-	padding-right: 10px;
-	background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #C3C2C8, stop: 1 #828288);
-}
-
-QPushButton:checked {
-	background-color: rgb(0,255,0);
-}
-
-QPushButton:pressed {
-	background-color: rgb(0,255,0);
+         <string notr="true">QPushButton:pressed {
+	background-color: rgb(100, 216, 100);
 }
 </string>
         </property>

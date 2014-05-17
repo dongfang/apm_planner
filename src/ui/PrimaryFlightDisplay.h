@@ -18,12 +18,13 @@ public slots:
     /** @brief Attitude from one specific component / redundant autopilot */
     void updateAttitude(UASInterface* uas, int component, double roll, double pitch, double yaw, quint64 timestamp);
 
-    void updatePrimarySpeed(UASInterface* uas, double speed, quint64 timstamp);
-    void updateGPSSpeed(UASInterface* uas, double speed, quint64 timstamp);
-    void updateClimbRate(UASInterface* uas, double altitude, quint64 timestamp);
-    void updatePrimaryAltitude(UASInterface* uas, double altitude, quint64 timestamp);
-    void updateGPSAltitude(UASInterface* uas, double altitude, quint64 timestamp);
+    void speedChanged(UASInterface* uas, double groundspeed, double airspeed, quint64 timestamp);
+    void altitudeChanged(UASInterface*uas, double altitudeAMSL, double altitudeRelative, double climbRate, quint64 timestamp);
     void updateNavigationControllerErrors(UASInterface* uas, double altitudeError, double speedError, double xtrackError);
+
+    void uasTextMessage(int uasid, int componentid, int severity, QString text);
+
+    void preArmMessageTimeout();
 
     /** @brief Set the currently monitored UAS */
     //void addUAS(UASInterface* uas);
@@ -86,7 +87,6 @@ private:
      * There are at least these differences between airplane and copter PDF view:
      * - Airplane show absolute altutude in altimeter, copter shows relative to home
      */
-    bool isAirplane();
     bool shouldDisplayNavigationData();
 
     void drawTextCenter(QPainter& painter, QString text, float fontSize, float x, float y);
@@ -102,7 +102,7 @@ private:
     void drawAICompassDisk(QPainter& painter, QRectF area, float halfspan);
     void drawSeparateCompassDisk(QPainter& painter, QRectF area);
 
-    void drawAltimeter(QPainter& painter, QRectF area, float altitude, float secondaryAltitude, float vv);
+    void drawAltimeter(QPainter& painter, QRectF area, float altitudeRelative, float altitudeAMSL, float vv);
     void drawVelocityMeter(QPainter& painter, QRectF area, float speed, float secondarySpeed);
     void fillInstrumentBackground(QPainter& painter, QRectF edge);
     void fillInstrumentOpagueBackground(QPainter& painter, QRectF edge);
@@ -125,6 +125,10 @@ private:
     SpeedMode speedMode;
     */
 
+    bool preArmCheckFailure;
+    QString preArmCheckMessage;
+    QTimer *preArmMessageTimer;
+
     bool didReceivePrimaryAltitude;
     bool didReceivePrimarySpeed;
 
@@ -132,17 +136,17 @@ private:
     float pitch;
     float heading;
 
-    float primaryAltitude;
-    float GPSAltitude;
+    float m_altitudeRelative;
+    float m_altitudeAMSL;
 
     // APM: GPS and baro mix above home (GPS) altitude. This value comes from the GLOBAL_POSITION_INT message.
     // Do !!!NOT!!! ever do altitude calculations at the ground station. There are enough pitfalls already.
     // If the MP "set home altitude" button is migrated to here, it must set the UAS home altitude, not a GS-local one.
     float aboveHomeAltitude;
 
-    float primarySpeed;
-    float groundspeed;
-    float verticalVelocity;
+    float m_groundspeed;
+    float m_airspeed;
+    float m_climbRate;
 
     float navigationAltitudeError;
     float navigationSpeedError;
@@ -176,7 +180,7 @@ private:
     static const int tickValues[];
     static const QString compassWindNames[];
 
-    static const int updateInterval = 40;   
+    static const int updateInterval = 250;
 };
 
 #endif // PRIMARYFLIGHTDISPLAY_H

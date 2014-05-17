@@ -49,6 +49,7 @@ public:
     void setFlightPlanViewAction(QAction *action);
     void setInitialSetupViewAction(QAction *action);
     void setConfigTuningViewAction(QAction *action);
+    void setPlotViewAction(QAction *action);
     void setSimulationViewAction(QAction *action);
     void setTerminalViewAction(QAction *action);
     void setConnectMAVAction(QAction *action);
@@ -60,6 +61,7 @@ signals:
     void triggerInitialSetupView();
     void triggerConfigTuningView();
     void triggerSimulationView();
+    void triggerPlotView();
     void triggerTerminalView();
 
     void MAVConnected(bool connected);
@@ -70,7 +72,10 @@ public slots:
     void selectInitialSetupView();
     void selectConfigTuningView();
     void selectSimulationView();
+    void selectPlotView();
     void selectTerminalView();
+
+    void checkAdvancedMode(bool checked);
 
     void connectMAV();
     void showConnectionDialog();
@@ -93,11 +98,16 @@ public slots:
     void stopAnimation();
 
     void disableConnectWidget(bool disable);
+    void overrideDisableConnectWidget(bool disable);
+
+    void parameterChanged(int uas, int component, int parameterCount,
+                          int parameterId, QString parameterName, QVariant value);
 
 private:
     QPointer<UASInterface> m_uas;
     QTimer m_heartbeatTimer;
     QPointer<LinkInterface> m_currentLink;
+    bool m_disableOverride;
 };
 
 #endif // APMTOOLBAR_H

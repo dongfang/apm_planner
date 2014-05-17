@@ -39,17 +39,15 @@ This file is part of the APM_PLANNER project
 #include <QTimer>
 
 APMToolBar::APMToolBar(QWidget *parent):
-    QDeclarativeView(parent), m_uas(NULL), m_currentLink(NULL)
+    QDeclarativeView(parent), m_uas(NULL), m_currentLink(NULL), m_disableOverride(false)
 {
     // Configure our QML object
-
-    QDir qmlBaseDir = QDir(qApp->applicationDirPath());
-    QLOG_DEBUG() << "qmlBaseDir" << qmlBaseDir;
-    QUrl url = QUrl::fromLocalFile(qmlBaseDir.absolutePath() + "/qml/ApmToolBar.qml");
+    QLOG_DEBUG() << "qmlBaseDir" << QGC::shareDirectory();
+    QUrl url = QUrl::fromLocalFile(QGC::shareDirectory() + "/qml/ApmToolBar.qml");
     QLOG_DEBUG() << url;
-    if (!QFile::exists(qmlBaseDir.absolutePath() + "/qml/ApmToolBar.qml"))
+    if (!QFile::exists(QGC::shareDirectory() + "/qml/ApmToolBar.qml"))
     {
-         QMessageBox::information(0,"Error","ApmToolBar.qml not found. Please reinstall the application and try again");
+        QMessageBox::information(0,"Error", "" + QGC::shareDirectory() + "/qml/ApmToolBar.qml" + " not found. Please reinstall the application and try again");
         exit(-1);
     }
     setSource(url);
@@ -74,6 +72,17 @@ APMToolBar::APMToolBar(QWidget *parent):
             this,SLOT(newLinkCreated(LinkInterface*)));
 
     connect(&m_heartbeatTimer, SIGNAL(timeout()), this, SLOT(stopHeartbeat()));
+    QSettings settings;
+    settings.beginGroup("QGC_MAINWINDOW");
+    if (settings.contains("ADVANCED_MODE"))
+    {
+       QMetaObject::invokeMethod(rootObject(),"setAdvancedMode", Q_ARG(QVariant, settings.value("ADVANCED_MODE").toBool()));
+    }
+}
+
+void APMToolBar::checkAdvancedMode(bool checked)
+{
+    QMetaObject::invokeMethod(rootObject(),"setAdvancedMode", Q_ARG(QVariant, checked));
 }
 
 void APMToolBar::activeUasSet(UASInterface *uas)
@@ -94,6 +103,8 @@ void APMToolBar::activeUasSet(UASInterface *uas)
                 this, SLOT(navModeChanged(int,int,QString)));
         disconnect(m_uas, SIGNAL(heartbeat(UASInterface*)),
                    this, SLOT(heartbeat(UASInterface*)));
+        disconnect(m_uas,SIGNAL(parameterChanged(int,int,int,int,QString,QVariant)),
+                this,SLOT(parameterChanged(int,int,int,int,QString,QVariant)));
 
         // disconnect signals from the active serial links
         QList<SerialLink*> sList = SerialLink::getSerialLinks(uas);
@@ -122,11 +133,14 @@ void APMToolBar::activeUasSet(UASInterface *uas)
             this, SLOT(navModeChanged(int,int,QString)));
     connect(m_uas, SIGNAL(heartbeat(UASInterface*)),
                this, SLOT(heartbeat(UASInterface*)));
+    connect(m_uas,SIGNAL(parameterChanged(int,int,int,int,QString,QVariant)),
+            this,SLOT(parameterChanged(int,int,int,int,QString,QVariant)));
 
-    if (m_uas->isFixedWing()) {
-        rootObject()->setProperty("disableStatusDisplay", QVariant(true));
+    if (m_uas->isFixedWing()||m_uas->isGroundRover()) {
+        rootObject()->setProperty("enableStatusDisplay", QVariant(false));
     } else {
-        rootObject()->setProperty("disableStatusDisplay", QVariant(false));
+        rootObject()->setProperty("enableStatusDisplay", QVariant(true));
+        rootObject()->setProperty("armed", QVariant(m_uas->isArmed()));
     }
 
     // Connect the signals from active links
@@ -177,6 +191,11 @@ void APMToolBar::setConfigTuningViewAction(QAction *action)
     connect(this, SIGNAL(triggerConfigTuningView()), action, SIGNAL(triggered()));
 }
 
+void APMToolBar::setPlotViewAction(QAction *action)
+{
+    connect(this, SIGNAL(triggerPlotView()), action, SIGNAL(triggered()));
+}
+
 void APMToolBar::setSimulationViewAction(QAction *action)
 {
     connect(this, SIGNAL(triggerSimulationView()), action, SIGNAL(triggered()));
@@ -221,6 +240,11 @@ void APMToolBar::selectSimulationView()
     QLOG_DEBUG() << "APMToolBar: selectSimulationView";
 }
 
+void APMToolBar::selectPlotView()
+{
+    QLOG_DEBUG() << "APMToolBar: selectPlotView";
+}
+
 void APMToolBar::selectTerminalView()
 {
     QLOG_DEBUG() << "APMToolBar: selectTerminalView";
@@ -250,7 +274,7 @@ void APMToolBar::connected(LinkInterface *linkInterface)
 
 void APMToolBar::disconnected(LinkInterface *linkInterface)
 {
-    QLOG_DEBUG() << "APMToolBar: connecting to link" << linkInterface;
+    QLOG_DEBUG() << "APMToolBar: disconnected from link" << linkInterface;
 
     if (m_uas) {
         // With an active UAS use the list of serial ports from that UAS
@@ -268,9 +292,7 @@ void APMToolBar::disconnected(LinkInterface *linkInterface)
         // the last one disconnected properties.
         QList<SerialLink*> sList = SerialLink::getSerialLinks(LinkManager::instance());
         foreach (SerialLink* sLink, sList) {
-            if (sLink->isConnected()){
-                updateLinkDisplay(sLink);
-            }
+            updateLinkDisplay(sLink);
         }
     }
 }
@@ -343,7 +365,7 @@ void APMToolBar::updateLinkDisplay(LinkInterface* link)
     QObject *object = rootObject();
 
     if (link && object){
-        qint64 baudrate = link->getNominalDataRate();
+        qint64 baudrate = link->getConnectionSpeed();
         object->setProperty("baudrateLabel", QString::number(baudrate));
 
         QString linkName = link->getName();
@@ -357,7 +379,7 @@ void APMToolBar::newLinkCreated(LinkInterface* newLink)
 {
     SerialLink* sLink = dynamic_cast<SerialLink*>(newLink);
     if(sLink) {
-        QLOG_DEBUG() << "APMToolBar: new Srial Link Created" << newLink;
+        QLOG_DEBUG() << "APMToolBar: new Serial Link Created" << newLink;
         m_currentLink = sLink;
         updateLinkDisplay(m_currentLink);
         connect(m_currentLink,SIGNAL(updateLink(LinkInterface*)),this,SLOT(updateLinkDisplay(LinkInterface*)));
@@ -448,8 +470,33 @@ void APMToolBar::stopAnimation()
 {
     rootObject()->setProperty("stopAnimation",QVariant(true));
 }
+void APMToolBar::overrideDisableConnectWidget(bool disable)
+{
+    m_disableOverride = disable;
+}
 
 void APMToolBar::disableConnectWidget(bool disable)
 {
-    rootObject()->setProperty("disableConnectWidget",QVariant(disable));
+    if (!m_disableOverride)
+    {
+        rootObject()->setProperty("disableConnectWidget",QVariant(disable));
+    }
+}
+
+void APMToolBar::parameterChanged(int uas, int component, int parameterCount,
+                                        int parameterId, QString parameterName, QVariant value)
+{
+    Q_UNUSED(uas);
+    Q_UNUSED(component);
+    Q_UNUSED(parameterCount);
+    Q_UNUSED(parameterId);
+
+    if (parameterName.contains("ARMING_REQUIRE")){
+        // Shows Display of ARM status, if enabled
+        int arming_required = value.toBool();
+        rootObject()->setProperty("armed", QVariant(m_uas->isArmed()));
+        rootObject()->setProperty("enableStatusDisplay",
+                                  QVariant(arming_required));
+    }
+
 }

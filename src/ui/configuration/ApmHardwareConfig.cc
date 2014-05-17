@@ -30,7 +30,7 @@ This file is part of the APM_PLANNER project
 #include "QsLog.h"
 #include "ApmHardwareConfig.h"
 
-ApmHardwareConfig::ApmHardwareConfig(QWidget *parent) : QWidget(parent),
+ApmHardwareConfig::ApmHardwareConfig(QWidget *parent) : AP2ConfigWidget(parent),
     m_paramDownloadState(none),
     m_paramDownloadCount(0),
     m_uas(NULL),
@@ -64,6 +64,7 @@ ApmHardwareConfig::ApmHardwareConfig(QWidget *parent) : QWidget(parent),
     ui.stackedWidget->addWidget(m_apmFirmwareConfig); //Firmware placeholder.
     m_buttonToConfigWidgetMap[ui.firmwareButton] = m_apmFirmwareConfig;
     connect(ui.firmwareButton,SIGNAL(clicked()),this,SLOT(activateStackedWidget()));
+    connect(this, SIGNAL(advancedModeChanged(bool)), m_apmFirmwareConfig, SLOT(advancedModeChanged(bool)));
 
     m_flightConfig = new FlightModeConfig(this);
     ui.stackedWidget->addWidget(m_flightConfig);
@@ -163,9 +164,15 @@ ApmHardwareConfig::ApmHardwareConfig(QWidget *parent) : QWidget(parent),
     ui.stackedWidget->setCurrentWidget(m_buttonToConfigWidgetMap[ui.hiddenPushButton]);
     ui.hiddenPushButton->setChecked(true);
 }
+
+void ApmHardwareConfig::advModeChanged(bool state)
+{
+    emit advancedModeChanged(state);
+}
+
 void ApmHardwareConfig::activateBlankingScreen()
 {
-        ui.stackedWidget->setCurrentWidget(m_setupWarningMessage);
+    ui.stackedWidget->setCurrentWidget(m_setupWarningMessage);
 }
 
 void ApmHardwareConfig::activateStackedWidget()
@@ -334,7 +341,7 @@ void ApmHardwareConfig::toggleButtonsShown(bool show)
         ui.batteryMonitorButton->setShown(!show);
         ui.opticalFlowButton->setShown(!show);
         ui.osdButton->setShown(!show);
-//        ui.cameraGimbalButton->setShown(!show);// [HIDE Camera Gimbal]
+        ui.cameraGimbalButton->setShown(!show);// [SHOW Camera Gimbal]
 //        ui.antennaTrackerButton->setShown(!show);// [HIDE Antenna Tracking]
         ui.sonarButton->setShown(!show);
 
@@ -354,7 +361,7 @@ void ApmHardwareConfig::toggleButtonsShown(bool show)
         ui.batteryMonitorButton->setShown(!show);
         ui.opticalFlowButton->setShown(!show);
         ui.osdButton->setShown(!show);
-//        ui.cameraGimbalButton->setShown(!show); // // [HIDE Camera Gimbal]
+        ui.cameraGimbalButton->setShown(!show); // [SHOW Camera Gimbal]
 //        ui.antennaTrackerButton->setShown(!show); // [HIDE Antenna Tracking]
         ui.airspeedButton->setShown(!show);
 
@@ -377,14 +384,16 @@ void ApmHardwareConfig::toggleButtonsShown(bool show)
         ui.batteryMonitorButton->setShown(!show);
         ui.opticalFlowButton->setShown(!show);
         ui.osdButton->setShown(!show);
-//        ui.cameraGimbalButton->setShown(!show); // [HIDE Camera Gimbal]
+        ui.cameraGimbalButton->setShown(!show); // [SHOW Camera Gimbal]
 //        ui.antennaTrackerButton->setShown(!show); // [HIDE Antenna Tracking]
         ui.sonarButton->setShown(!show);
     }
 }
 
-void ApmHardwareConfig::parameterChanged(int uas, int component, int parameterCount, int parameterId, QString parameterName, QVariant value)
+void ApmHardwareConfig::parameterChanged(int uas, int component, int parameterCount, int parameterId,
+                                         QString parameterName, QVariant value)
 {
+
     QString countString;
     // Create progress of downloading all parameters for UI
     switch (m_paramDownloadState){

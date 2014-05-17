@@ -63,12 +63,19 @@ This file is part of the QGROUNDCONTROL project
  * @param argv The string array of parameters
  **/
 
-#define define2string_p(x) #x
-#define define2string(x) define2string_p(x)
 
 QGCCore::QGCCore(int &argc, char* argv[]) : QApplication(argc, argv)
 {
-        m_mouseWheelFilter = new QGCMouseWheelEventFilter(this);
+    // Set settings format
+    QSettings::setDefaultFormat(QSettings::IniFormat);
+
+    // Set application name
+    this->setApplicationName(QGC_APPLICATION_NAME);
+    this->setApplicationVersion(QGC_APPLICATION_VERSION);
+    this->setOrganizationName(QLatin1String("diydrones"));
+    this->setOrganizationDomain("com.diydrones");
+
+    m_mouseWheelFilter = new QGCMouseWheelEventFilter(this);
 }
 
 void QGCCore::initialize()
@@ -79,15 +86,6 @@ void QGCCore::initialize()
     QLOG_INFO() << "Git Commit:" << define2string(GIT_COMMIT);
     QLOG_INFO() << "APPLICATION_NAME:" << define2string(QGC_APPLICATION_NAME);
     QLOG_INFO() << "APPLICATION_VERSION:" << define2string(QGC_APPLICATION_VERSION);
-
-    // Set application name
-    this->setApplicationName(QGC_APPLICATION_NAME);
-    this->setApplicationVersion(QGC_APPLICATION_VERSION);
-    this->setOrganizationName(QLatin1String("diydrones"));
-    this->setOrganizationDomain("com.diydrones");
-
-    // Set settings format
-    QSettings::setDefaultFormat(QSettings::IniFormat);
 
     // Check application settings
     // clear them if they mismatch
@@ -168,8 +166,10 @@ void QGCCore::initialize()
     OpalLink* opalLink = new OpalLink();
     MainWindow::instance()->addLink(opalLink);
 #endif
+#ifdef SIMULATION_LINK
     MAVLinkSimulationLink* simulationLink = new MAVLinkSimulationLink(":/demo-log.txt");
     simulationLink->disconnect();
+#endif
 
 
     //We want to have a default serial link available for "quick" connecting.
@@ -205,7 +205,6 @@ void QGCCore::initialize()
             QTimer::singleShot(200, mainWindow, SLOT(close()));
         }
     }
-
 }
 
 /**
@@ -214,9 +213,8 @@ void QGCCore::initialize()
  **/
 QGCCore::~QGCCore()
 {
-    //mainWindow->storeSettings();
-    //mainWindow->close();
-    //mainWindow->deleteLater();
+    QGC::saveSettings();
+    QGC::close();
     // Delete singletons
     // First systems
     delete UASManager::instance();

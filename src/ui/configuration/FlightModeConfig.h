@@ -43,18 +43,37 @@ class FlightModeConfig : public AP2ConfigWidget
 public:
     explicit FlightModeConfig(QWidget *parent = 0);
     ~FlightModeConfig();
+
 private slots:
     void activeUASSet(UASInterface *uas);
     void saveButtonClicked();
     void modeChanged(int sysId, QString status, QString description);
     void remoteControlChannelRawChanged(int chan,float val);
     void parameterChanged(int uas, int component, QString parameterName, QVariant value);
+
+    void resetMaximum();
+    void comboBoxChanged(int index);
+    void enableSaveButton();
+
 private:
-    QMap<int,int> roverModeIndexToUiIndex;
-    QMap<int,int> planeModeIndexToUiIndex;
-    QMap<int,int> roverModeUiIndexToIndex;
-    QMap<int,int> planeModeUiIndexToIndex;
+    void addPlaneModes(QComboBox &comboBox);
+    void addCopterModes(QComboBox &comboBox);
+    void addRoverModes(QComboBox &comboBox);
+
+    bool isFlightModeChanged();
+
+    void updateModeComboBox(QComboBox *modeComboBox, QVariant value, bool &modeChanged);
+    int getSimpleValue();
+    void checkForComboxBoxChanged(QObject* sender, QComboBox *comboBox, int index,
+                                  bool &modeChanged, const QString& param);
+
+private:
     Ui::FlightModeConfig ui;
+
+    QList<bool> m_changedModes;
+    int m_modesUpdated;
+    QString m_modeString;  // Array to store if the flight mode has changed
+
 };
 
 #endif // FLIGHTMODECONFIG_H

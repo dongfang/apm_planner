@@ -30,7 +30,7 @@ Rectangle {
     property bool connected: false
     property bool armed: false
     property string armedstr: "status"
-    property bool disableStatusDisplay: false
+    property bool enableStatusDisplay: true
 
     property alias modeText: modeTextId.modeText
     property alias modeTextColor: modeTextId.modeTextColor
@@ -62,6 +62,10 @@ Rectangle {
         modeTextId.modeText = "mode"
     }
 
+    function setAdvancedMode(state){
+        terminalView.visible = state
+    }
+
     width: toolbar.width
     height: 72
     color: "black"
@@ -87,13 +91,13 @@ Rectangle {
         }
     }
 
-    onDisableStatusDisplayChanged: {
-        if (disableStatusDisplay) {
-            statusSpacerId.visible = false
-            statusDisplayId.visible = false
-        } else {
+    onEnableStatusDisplayChanged: {
+        if (enableStatusDisplay) {
             statusSpacerId.visible = true
             statusDisplayId.visible = true
+        } else {
+            statusSpacerId.visible = false
+            statusDisplayId.visible = false
         }
     }
 
@@ -154,6 +158,13 @@ Rectangle {
             onClicked: globalObj.triggerConfigTuningView()
         }
 
+        Button {
+            id: plotView
+            label: "GRAPHS"
+            image: "./resources/apmplanner/toolbar/simulation.png"
+            onClicked: globalObj.triggerPlotView()
+        }
+
 // [TODO] removed from toolbar until we have simulation working
 //        Button {
 //            id: simulationView
@@ -167,6 +178,7 @@ Rectangle {
             label: "TERMINAL"
             image: "./resources/apmplanner/toolbar/terminal.png"
             onClicked: globalObj.triggerTerminalView()
+            visible: false
         }
 
         Rectangle { // Spacer

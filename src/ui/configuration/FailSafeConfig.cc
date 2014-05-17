@@ -106,6 +106,7 @@ FailSafeConfig::FailSafeConfig(QWidget *parent) : AP2ConfigWidget(parent)
     ui.throttleFailSafeComboBox->addItem("Disable");
     ui.throttleFailSafeComboBox->addItem("Enabled - Always RTL");
     ui.throttleFailSafeComboBox->addItem("Enabled - Continue in auto");
+    ui.throttleFailSafeComboBox->addItem("Enabled - always LAND");
 
     connect(ui.batteryFailCheckBox,SIGNAL(clicked(bool)),this,SLOT(batteryFailChecked(bool)));
     connect(ui.fsLongCheckBox,SIGNAL(clicked(bool)),this,SLOT(fsLongClicked(bool)));
@@ -287,7 +288,7 @@ void FailSafeConfig::activeUASSet(UASInterface *uas)
     if (m_uas)
     {
         disconnect(m_uas,SIGNAL(remoteControlChannelRawChanged(int,float)),this,SLOT(remoteControlChannelRawChanges(int,float)));
-        disconnect(m_uas,SIGNAL(hilActuatorsChanged(uint64_t,float,float,float,float,float,float,float,float)),this,SLOT(hilActuatorsChanged(uint64_t,float,float,float,float,float,float,float,float)));
+        disconnect(m_uas,SIGNAL(servoRawOutputChanged(uint64_t,float,float,float,float,float,float,float,float)),this,SLOT(hilActuatorsChanged(uint64_t,float,float,float,float,float,float,float,float)));
         disconnect(m_uas,SIGNAL(armingChanged(bool)),this,SLOT(armingChanged(bool)));
         disconnect(m_uas,SIGNAL(navModeChanged(int,int,QString)),this,SLOT(navModeChanged(int,int,QString)));
     }
@@ -297,7 +298,7 @@ void FailSafeConfig::activeUASSet(UASInterface *uas)
         return;
     }
     connect(m_uas,SIGNAL(remoteControlChannelRawChanged(int,float)),this,SLOT(remoteControlChannelRawChanges(int,float)));
-    connect(m_uas,SIGNAL(hilActuatorsChanged(uint64_t,float,float,float,float,float,float,float,float)),this,SLOT(hilActuatorsChanged(uint64_t,float,float,float,float,float,float,float,float)));
+    connect(m_uas,SIGNAL(servoRawOutputChanged(uint64_t,float,float,float,float,float,float,float,float)),this,SLOT(hilActuatorsChanged(uint64_t,float,float,float,float,float,float,float,float)));
     connect(m_uas,SIGNAL(armingChanged(bool)),this,SLOT(armingChanged(bool)));
     connect(m_uas,SIGNAL(gpsLocalizationChanged(UASInterface*,int)),this,SLOT(gpsStatusChanged(UASInterface*,int)));
     connect(m_uas,SIGNAL(navModeChanged(int,int,QString)),this,SLOT(navModeChanged(int,int,QString)));

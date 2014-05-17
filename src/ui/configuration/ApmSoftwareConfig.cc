@@ -28,6 +28,7 @@ This file is part of the APM_PLANNER project
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QNetworkRequest>
+#include <QSettings>
 
 ApmSoftwareConfig::ApmSoftwareConfig(QWidget *parent) : QWidget(parent),
     m_paramDownloadState(none),
@@ -42,8 +43,11 @@ ApmSoftwareConfig::ApmSoftwareConfig(QWidget *parent) : QWidget(parent),
     ui.advancedParamButton->setVisible(false);
     ui.advParamListButton->setVisible(false);
     ui.arduCopterPidButton->setVisible(false);
+    ui.arduCopterPidButton->setText(tr("Extended Tuning"));
     ui.arduRoverPidButton->setVisible(false);
+    ui.arduRoverPidButton->setText(tr("Tuning"));
     ui.arduPlanePidButton->setVisible(false);
+    ui.arduPlanePidButton->setText(tr("Tuning"));
     ui.basicPidButton->setVisible(false);
 
     m_flightConfig = new FlightModeConfig(this);
@@ -107,7 +111,25 @@ ApmSoftwareConfig::ApmSoftwareConfig(QWidget *parent) : QWidget(parent),
     // Setup Parameter Progress bars
     ui.globalParamProgressBar->setRange(0,100);
 
+    QSettings settings;
+    settings.beginGroup("QGC_MAINWINDOW");
+    if (settings.contains("ADVANCED_MODE"))
+    {
+        m_isAdvancedMode = settings.value("ADVANCED_MODE").toBool();
+    }
+
+    connect(&m_populateTimer,SIGNAL(timeout()),this,SLOT(populateTimerTick()));
 }
+
+void ApmSoftwareConfig::advModeChanged(bool state)
+{
+    m_isAdvancedMode = state;
+    if(m_uas){
+        uasConnected();
+    }
+
+}
+
 void ApmSoftwareConfig::apmParamNetworkReplyFinished()
 {
     QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
@@ -116,12 +138,7 @@ void ApmSoftwareConfig::apmParamNetworkReplyFinished()
         return;
     }
     QByteArray apmpdef = reply->readAll();
-#ifdef Q_OS_WIN
-    QString appDataDir = QString(getenv("USERPROFILE")).replace("\\","/");
-#else
-    QString appDataDir = getenv("HOME");
-#endif
-    m_apmPdefFilename = QDir(appDataDir + "/apmplanner2").filePath("apm.pdef.xml");
+    m_apmPdefFilename = QDir(QGC::appDataDirectory()).filePath("apm.pdef.xml");
     QFile file(m_apmPdefFilename);
     file.open(QIODevice::ReadWrite | QIODevice::Truncate);
     file.write(apmpdef);
@@ -167,14 +184,18 @@ void ApmSoftwareConfig::uasConnected()
         ui.arduCopterPidButton->setVisible(false);
         ui.arduRoverPidButton->setVisible(false);
         ui.basicPidButton->setVisible(false);
+        ui.advParamListButton->setVisible(m_isAdvancedMode);
+        ui.advancedParamButton->setVisible(m_isAdvancedMode);
     }
     else if (m_uas->isMultirotor())
     {
         ui.geoFenceButton->setVisible(true);
-        ui.arduCopterPidButton->setVisible(true);
+        ui.arduCopterPidButton->setVisible(m_isAdvancedMode);
         ui.arduPlanePidButton->setVisible(false);
         ui.arduRoverPidButton->setVisible(false);
         ui.basicPidButton->setVisible(true);
+        ui.advParamListButton->setVisible(m_isAdvancedMode);
+        ui.advancedParamButton->setVisible(m_isAdvancedMode);
     }
     else if (m_uas->isGroundRover())
     {
@@ -183,6 +204,8 @@ void ApmSoftwareConfig::uasConnected()
         ui.arduCopterPidButton->setVisible(false);
         ui.arduPlanePidButton->setVisible(false);
         ui.basicPidButton->setVisible(false);
+        ui.advParamListButton->setVisible(m_isAdvancedMode);
+        ui.advancedParamButton->setVisible(m_isAdvancedMode);
     }
 }
 
@@ -215,31 +238,18 @@ void ApmSoftwareConfig::activeUASSet(UASInterface *uas)
     QString compare = "";
     if (uas->isFixedWing())
     {
-        ui.geoFenceButton->setVisible(false); // [TODO] Ony support copter for now
-        ui.arduPlanePidButton->setVisible(true);
-        ui.arduCopterPidButton->setVisible(false);
-        ui.arduRoverPidButton->setVisible(false);
-        ui.basicPidButton->setVisible(false);
         compare = "ArduPlane";
     }
     else if (uas->isMultirotor())
     {
-        ui.geoFenceButton->setVisible(true);
-        ui.arduCopterPidButton->setVisible(true);
-        ui.arduPlanePidButton->setVisible(false);
-        ui.arduRoverPidButton->setVisible(false);
-        ui.basicPidButton->setVisible(true);
         compare = "ArduCopter";
     }
     else if (uas->isGroundRover())
     {
-        ui.geoFenceButton->setVisible(false);  // [TODO] Ony support copter for now
-        ui.arduRoverPidButton->setVisible(true);
-        ui.arduCopterPidButton->setVisible(false);
-        ui.arduPlanePidButton->setVisible(false);
-        ui.basicPidButton->setVisible(false);
         compare = "APMRover2";
     }
+
+    uasConnected();
 
 #ifdef Q_OS_WIN
     QString appDataDir = QString(getenv("USERPROFILE")).replace("\\","/");
@@ -249,7 +259,7 @@ void ApmSoftwareConfig::activeUASSet(UASInterface *uas)
     m_apmPdefFilename = QDir(appDataDir + "/apmplanner2").filePath("apm.pdef.xml");
     if (!QFile::exists(m_apmPdefFilename))
     {
-        QDir autopilotdir(qApp->applicationDirPath() + "/files/" + uas->getAutopilotTypeName().toLower());
+        QDir autopilotdir(QGC::shareDirectory() + "/files/" + uas->getAutopilotTypeName().toLower());
         m_apmPdefFilename = autopilotdir.absolutePath() + "/arduplane.pdef.xml";
     }
 
@@ -294,6 +304,7 @@ void ApmSoftwareConfig::activeUASSet(UASInterface *uas)
                                     QString humanname = xml.attributes().value("humanName").toString();
                                     QString name = xml.attributes().value("name").toString();
                                     QString tab= xml.attributes().value("user").toString();
+                                    QString range = "";
                                     if (name.contains(":"))
                                     {
                                         name = name.split(":")[1].toUpper();
@@ -358,6 +369,7 @@ void ApmSoftwareConfig::activeUASSet(UASInterface *uas)
                                                 min = fieldmap["Range"].split("-")[0].trimmed().toFloat();
                                                 max = fieldmap["Range"].split("-")[1].trimmed().toFloat();
                                             }
+                                            range = QString("%1 to %2").arg(min).arg(max);
                                         }
                                     }
                                     QString units = "";
@@ -378,13 +390,27 @@ void ApmSoftwareConfig::activeUASSet(UASInterface *uas)
                                         {
                                             if (tab == "Standard")
                                             {
-                                                m_standardParamConfig->addCombo(humanname,docs,name,valuelist);
+                                                ParamConfig c;
+                                                c.name = humanname;
+                                                c.docs = docs;
+                                                c.param = name;
+                                                c.valuelist = valuelist;
+                                                c.isAdvanced = false;
+                                                c.isRange = false;
+                                                m_paramConfigList.append(c);
                                             }
                                             else if (tab == "Advanced")
                                             {
-                                                m_advancedParamConfig->addCombo(humanname,docs,name,valuelist);
+                                                ParamConfig c;
+                                                c.name = humanname;
+                                                c.docs = docs;
+                                                c.param = name;
+                                                c.valuelist = valuelist;
+                                                c.isAdvanced = true;
+                                                c.isRange = false;
+                                                m_paramConfigList.append(c);
                                             }
-                                            m_advParameterList->setParameterMetaData(name,humanname,docs,units);
+                                            m_advParameterList->setParameterMetaData(name,humanname,docs,units,range);
                                         }
                                     }
                                     else if (fieldmap.size() > 0)
@@ -406,18 +432,37 @@ void ApmSoftwareConfig::activeUASSet(UASInterface *uas)
                                                 max = fieldmap["Range"].split("-")[1].trimmed().toFloat();
                                             }
                                             increment = (max - min) / 100.0; //1% of total range increment
+                                            range = QString("%1 to %2").arg(min).arg(max);
                                         }
                                         if (compare == parametersname || valuetype == "libraries")
                                         {
                                             if (tab == "Standard")
                                             {
-                                                m_standardParamConfig->addRange(humanname,docs,name,min,max,increment);
+                                                ParamConfig c;
+                                                c.name = humanname;
+                                                c.docs = docs;
+                                                c.param = name;
+                                                c.min = min;
+                                                c.max = max;
+                                                c.increment = increment;
+                                                c.isAdvanced = false;
+                                                c.isRange = true;
+                                                m_paramConfigList.append(c);
                                             }
                                             else if (tab == "Advanced")
                                             {
-                                                m_advancedParamConfig->addRange(humanname,docs,name,min,max,increment);
+                                                ParamConfig c;
+                                                c.name = humanname;
+                                                c.docs = docs;
+                                                c.param = name;
+                                                c.min = min;
+                                                c.max = max;
+                                                c.increment = increment;
+                                                c.isAdvanced = true;
+                                                c.isRange = true;
+                                                m_paramConfigList.append(c);
                                             }
-                                            m_advParameterList->setParameterMetaData(name,humanname,docs,units);
+                                            m_advParameterList->setParameterMetaData(name,humanname,docs,units,range);
                                         }
                                     }
 
@@ -434,6 +479,43 @@ void ApmSoftwareConfig::activeUASSet(UASInterface *uas)
         }
         xml.readNext();
     }
+
+    m_populateTimer.start(1);
+
+}
+void ApmSoftwareConfig::populateTimerTick()
+{
+    if (m_paramConfigList.size() == 0)
+    {
+        m_populateTimer.stop();
+        m_advancedParamConfig->allParamsAdded();
+        m_standardParamConfig->allParamsAdded();
+        return;
+    }
+    if (m_paramConfigList.at(0).isRange)
+    {
+        if (m_paramConfigList.at(0).isAdvanced)
+        {
+            m_advancedParamConfig->addRange(m_paramConfigList.at(0).name,m_paramConfigList.at(0).docs,m_paramConfigList.at(0).param,m_paramConfigList.at(0).min,m_paramConfigList.at(0).max,m_paramConfigList.at(0).increment);
+        }
+        else
+        {
+            m_standardParamConfig->addRange(m_paramConfigList.at(0).name,m_paramConfigList.at(0).docs,m_paramConfigList.at(0).param,m_paramConfigList.at(0).min,m_paramConfigList.at(0).max,m_paramConfigList.at(0).increment);
+        }
+    }
+    else
+    {
+        if (m_paramConfigList.at(0).isAdvanced)
+        {
+            m_advancedParamConfig->addCombo(m_paramConfigList.at(0).name,m_paramConfigList.at(0).docs,m_paramConfigList.at(0).param,m_paramConfigList.at(0).valuelist);
+        }
+        else
+        {
+            m_standardParamConfig->addCombo(m_paramConfigList.at(0).name,m_paramConfigList.at(0).docs,m_paramConfigList.at(0).param,m_paramConfigList.at(0).valuelist);
+
+        }
+    }
+    m_paramConfigList.removeAt(0);
 
 }
 
@@ -490,7 +572,7 @@ void ApmSoftwareConfig::parameterChanged(int uas, int component, int parameterCo
         ui.globalParamProgressBar->setValue((m_paramDownloadCount/(float)parameterCount)*100.0);
 
         if (m_paramDownloadCount == parameterCount){
-            m_paramDownloadState = completed;
+            m_paramDownloadState = none;
             ui.globalParamStateLabel->setText(tr("Params Downloaded"));
         }
         break;

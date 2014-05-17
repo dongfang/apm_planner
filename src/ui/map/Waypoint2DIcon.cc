@@ -247,8 +247,9 @@ void Waypoint2DIcon::drawIcon()
 void Waypoint2DIcon::SetShowNumber(const bool &value)
 {
     shownumber=value;
-    if((numberI==0) && value)
+    if((numberI == NULL) && value)
     {
+        Q_ASSERT(numberIBG == NULL);
         numberI=new QGraphicsSimpleTextItem(this);
         numberIBG=new QGraphicsRectItem(this);
         numberIBG->setBrush(Qt::black);
@@ -263,7 +264,9 @@ void Waypoint2DIcon::SetShowNumber(const bool &value)
     else if (!value && numberI)
     {
         delete numberI;
+        numberI = NULL;
         delete numberIBG;
+        numberIBG = NULL;
     }
     this->update();
 }
@@ -292,6 +295,8 @@ void Waypoint2DIcon::paint(QPainter *painter, const QStyleOptionGraphicsItem *op
         redPen.setWidth(1);
         painter->setPen(redPen);
         const int acceptance = map->metersToPixels(waypoint->getAcceptanceRadius(), Coord());
+        if (acceptance <= 0)
+            return;
         painter->setPen(penBlack);
         painter->drawEllipse(QPointF(0, 0), acceptance, acceptance);
         painter->setPen(redPen);

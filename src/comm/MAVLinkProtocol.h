@@ -66,6 +66,8 @@ public:
     MAVLinkProtocol();
     ~MAVLinkProtocol();
 
+    void throwAwayGCSPackets(bool throwaway);
+
     /** @brief Get the human-friendly name of this protocol */
     QString getName();
     /** @brief Get the system id of this application */
@@ -104,6 +106,7 @@ public:
     }
     /** @brief Get the name of the packet log file */
     QString getLogfileName();
+
     /** @brief Get state of parameter retransmission */
     bool paramGuardEnabled() {
         return m_paramGuardEnabled;
@@ -124,10 +127,36 @@ public:
     int getActionRetransmissionTimeout() {
         return m_actionRetransmissionTimeout;
     }
+    /**
+     * Retrieve a total of all successfully parsed packets for the specified link.
+     * @returns -1 if this is not available for this protocol, # of packets otherwise.
+     */
+    qint32 getReceivedPacketCount(const LinkInterface *link) const {
+        return totalReceiveCounter[link->getId()];
+    }
+    /**
+     * Retrieve a total of all parsing errors for the specified link.
+     * @returns -1 if this is not available for this protocol, # of errors otherwise.
+     */
+    qint32 getParsingErrorCount(const LinkInterface *link) const {
+        return totalErrorCounter[link->getId()];
+    }
+    /**
+     * Retrieve a total of all dropped packets for the specified link.
+     * @returns -1 if this is not available for this protocol, # of packets otherwise.
+     */
+    qint32 getDroppedPacketCount(const LinkInterface *link) const {
+        return totalLossCounter[link->getId()];
+    }
+    /**
+     * Reset the counters for all metadata for this link.
+     */
+    virtual void resetMetadataForLink(const LinkInterface *link);
 
 public slots:
     /** @brief Receive bytes from a communication interface */
     void receiveBytes(LinkInterface* link, QByteArray b);
+    void linkStatusChanged(bool connected);
     /** @brief Send MAVLink message through serial interface */
     void sendMessage(mavlink_message_t message);
     /** @brief Send MAVLink message */
@@ -142,8 +171,11 @@ public slots:
     /** @brief Enable / disable the heartbeat emission */
     void enableHeartbeats(bool enabled);
 
-    /** @brief Enable/disable binary packet logging */
-    void enableLogging(bool enabled);
+    /** @brief Starts binary packet logging */
+    bool startLogging(const QString &filename);
+
+    /** @brief Stops binary packet logging)*/
+    void stopLogging();
 
     /** @brief Enabled/disable packet multiplexing */
     void enableMultiplexing(bool enabled);
@@ -162,9 +194,6 @@ public slots:
 
     /** @brief Set parameter read timeout */
     void setActionRetransmissionTimeout(int ms);
-
-    /** @brief Set log file name */
-    void setLogfileName(const QString& filename);
 
     /** @brief Enable / disable version check */
     void enableVersionCheck(bool enabled);
@@ -200,14 +229,16 @@ protected:
     bool m_paramGuardEnabled;       ///< Parameter retransmission/rewrite enabled
     bool m_actionGuardEnabled;       ///< Action request retransmission enabled
     int m_actionRetransmissionTimeout; ///< Timeout for parameter retransmission
-    QMutex receiveMutex;       ///< Mutex to protect receiveBytes function
-    int lastIndex[256][256];	///< Store the last received sequence ID for each system/componenet pair
-    int totalReceiveCounter;
-    int totalLossCounter;
-    int currReceiveCounter;
-    int currLossCounter;
+    QMutex receiveMutex;        ///< Mutex to protect receiveBytes function
+    int lastIndex[256][256];    ///< Store the last received sequence ID for each system/componenet pair
+    int totalReceiveCounter[MAVLINK_COMM_NUM_BUFFERS];    ///< The total number of successfully received messages
+    int totalLossCounter[MAVLINK_COMM_NUM_BUFFERS];       ///< Total messages lost during transmission.
+    int totalErrorCounter[MAVLINK_COMM_NUM_BUFFERS];      ///< Total count of all parsing errors. Generally <= totalLossCounter.
+    int currReceiveCounter[MAVLINK_COMM_NUM_BUFFERS];     ///< Received messages during this sample time window. Used for calculating loss %.
+    int currLossCounter[MAVLINK_COMM_NUM_BUFFERS];        ///< Lost messages during this sample time window. Used for calculating loss %.
     bool versionMismatchIgnore;
     int systemId;
+	bool m_throwAwayGCSPackets;
 #if defined(QGC_PROTOBUF_ENABLED) && defined(QGC_USE_PIXHAWK_MESSAGES)
     mavlink::ProtobufManager protobufManager;
 #endif

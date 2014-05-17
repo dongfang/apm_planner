@@ -8,11 +8,11 @@ UASQuickViewTextItem::UASQuickViewTextItem(QWidget *parent) : UASQuickViewItem(p
     this->setLayout(layout);
     layout->setSpacing(0);
     layout->setMargin(0);
-    titleLabel = new QLabel(this);
+    titleLabel = new UASQuickViewTextLabel(this);
    //titleLabel->setSizePolicy(QSizePolicy::Ignored,QSizePolicy::Ignored);
     titleLabel->setAlignment(Qt::AlignHCenter | Qt::AlignBottom);
     this->layout()->addWidget(titleLabel);
-    valueLabel = new QLabel(this);
+    valueLabel = new UASQuickViewTextLabel(this);
     //valueLabel->setSizePolicy(QSizePolicy::Ignored,QSizePolicy::Ignored);
     valueLabel->setAlignment(Qt::AlignHCenter | Qt::AlignTop);
     valueLabel->setText("0.00");
@@ -23,8 +23,11 @@ UASQuickViewTextItem::UASQuickViewTextItem(QWidget *parent) : UASQuickViewItem(p
     QFont titlefont = titleLabel->font();
     valuefont.setPixelSize(this->height() / 2.0);
     titlefont.setPixelSize(this->height() / 4.0);
-    valueLabel->setFont(valuefont);
-    titleLabel->setFont(titlefont);
+    valueLabel->setFontSize(this->height() / 2.0);
+    titleLabel->setFontSize(this->height() / 4.0);
+    QColor color = QColor::fromRgb(rand()%255,rand()%255,rand()%255);
+    titleLabel->setFontColor(color);
+    valueLabel->setFontColor(color);
 }
 QString UASQuickViewTextItem::value()
 {
@@ -38,6 +41,16 @@ QString UASQuickViewTextItem::title()
 
 void UASQuickViewTextItem::setValue(double value)
 {
+
+    //Lon/Lat needs 7 decimal places, everything else should be scaled by value.
+    if ((titleLabel->text().toLower() == "longitude") ||
+            (titleLabel->text().toLower() == "latitude") ||
+            (titleLabel->text().toLower() == "lon") ||
+            (titleLabel->text().toLower() == "lat"))
+    {
+        valueLabel->setText(QString::number(value,'f',7));
+        return;
+    }
     if (value < 10 && value > -10)
     {
         valueLabel->setText(QString::number(value,'f',2));
@@ -62,7 +75,7 @@ void UASQuickViewTextItem::setValue(double value)
 
 void UASQuickViewTextItem::setTitle(QString title)
 {
-    if (title.indexOf(".") != -1 && title.indexOf(":") != -1)
+    if (title.indexOf("."))
     {
         titleLabel->setText(title.mid(title.indexOf(".")+1));
     }
@@ -114,9 +127,9 @@ void UASQuickViewTextItem::setValuePixelSize(int size)
     QFont valuefont = valueLabel->font();
     QFont titlefont = titleLabel->font();
     valuefont.setPixelSize(size);
-    titlefont.setPixelSize(valuefont.pixelSize() / 1.3);
-    valueLabel->setFont(valuefont);
-    titleLabel->setFont(titlefont);
+    titlefont.setPixelSize(valuefont.pixelSize() / 1.6);
+    valueLabel->setFontSize(size);
+    titleLabel->setFontSize(size / 1.6);
     update();
 }
 
@@ -157,7 +170,7 @@ void UASQuickViewTextItem::resizeEvent(QResizeEvent *event)
             QLOG_TRACE() << "Point size:" << valuefont.pixelSize() << valueLabel->width() << valueLabel->height();
         }
     }
-titlefont.setPixelSize(valuefont.pixelSize() / 1.6);
+titlefont.setPixelSize(valuefont.pixelSize() / 1.8);
     valueLabel->setFont(valuefont);
     titleLabel->setFont(titlefont);
     update();

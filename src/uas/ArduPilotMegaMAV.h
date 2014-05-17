@@ -52,16 +52,23 @@ protected:
 
 class ApmPlane: public CustomMode {
 public:
+    static const int modeCount = 16;
     enum planeMode {
     MANUAL        = 0,
     CIRCLE        = 1,
     STABILIZE     = 2,
     TRAINING      = 3,
+    ACRO          = 4,
     FLY_BY_WIRE_A = 5,
     FLY_BY_WIRE_B = 6,
+    CRUISE        = 7,
+    RESERVED_8    = 8,  // RESERVED FOR FUTURE USE
+    RESERVED_9    = 9,  // RESERVED FOR FUTURE USE
     AUTO          = 10,
     RTL           = 11,
     LOITER        = 12,
+    RESERVED_13   = 13, // RESERVED FOR FUTURE USE
+    RESERVED_14   = 14, // RESERVED FOR FUTURE USE
     GUIDED        = 15,
     INITIALIZING  = 16
     };
@@ -75,6 +82,7 @@ public:
 
 class ApmCopter: public CustomMode {
 public:
+    static const int modeCount = 17;
     enum copterMode {
     STABILIZE   = 0,   // hold level position
     ACRO        = 1,   // rate control
@@ -88,9 +96,12 @@ public:
     LAND        = 9,   // AUTO control
     OF_LOITER   = 10,  // Hold a single location using optical flow
                        // sensor
-    TOY_A       = 11,  // THOR Enum for Toy mode
-    TOY_M       = 12,  // THOR Enum for Toy mode
-    SPORT       = 13   // [TODO] Verify this is correct.
+    DRIFT       = 11,  // Drift 'Car Like' mode
+    RESERVED_12 = 12,  // RESERVED FOR FUTURE USE
+    SPORT       = 13,  // [TODO] Verify this is correct.
+    FLIP        = 14,
+    AUTOTUNE    = 15,
+    HYBRID_LOITER = 16 // HYBRID LOITER.
     };
 
 public:
@@ -101,15 +112,25 @@ public:
 
 class ApmRover: public CustomMode {
 public:
+    static const int modeCount = 16;
     enum roverMode {
-    MANUAL      =0,
-    LEARNING    =2,
-    STEERING    =3,
-    HOLD        =4,
-    AUTO        =10,
-    RTL         =11,
-    GUIDED      =15,
-    INITIALIZING=16
+    MANUAL        = 0,
+    RESERVED_1    = 1, // RESERVED FOR FUTURE USE
+    LEARNING      = 2,
+    STEERING      = 3,
+    HOLD          = 4,
+    RESERVED_5    = 5, // RESERVED FOR FUTURE USE
+    RESERVED_6    = 6, // RESERVED FOR FUTURE USE
+    RESERVED_7    = 7, // RESERVED FOR FUTURE USE
+    RESERVED_8    = 8, // RESERVED FOR FUTURE USE
+    RESERVED_9    = 9, // RESERVED FOR FUTURE USE
+    AUTO          = 10,
+    RTL           = 11,
+    RESERVED_12   = 12, // RESERVED FOR FUTURE USE
+    RESERVED_13   = 13, // RESERVED FOR FUTURE USE
+    RESERVED_14   = 14, // RESERVED FOR FUTURE USE
+    GUIDED        = 15,
+    INITIALIZING  = 16,
     };
 public:
     ApmRover(roverMode aMode);
@@ -130,27 +151,32 @@ public:
 
     QString getCustomModeText();
     QString getCustomModeAudioText();
+    void playCustomModeChangedAudioMessage();
+    void playArmStateChangedAudioMessage(bool armedState) ;
+
+signals:
+    void versionDetected(QString versionString);
 
 public slots:
     /** @brief Receive a MAVLink message from this MAV */
     void receiveMessage(LinkInterface* link, mavlink_message_t message);
     void RequestAllDataStreams();
 
-    void systemDisarmed();
-    void systemArmed();
-
     // Overides from UAS virtual interface
     virtual void armSystem();
     virtual void disarmSystem();
 
-    void navModeChanged(int uasid, int mode, const QString& text);
-
     // UAS Interface
     void textMessageReceived(int uasid, int componentid, int severity, QString text);
+    void heartbeatTimeout(bool timeout, unsigned int ms);
 
 private slots:
     void uasConnected();
     void uasDisconnected();
+
+private:
+    void createNewMAVLinkLog(uint8_t type);
+
 private:
     QTimer *txReqTimer;
 };

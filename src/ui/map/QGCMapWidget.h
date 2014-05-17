@@ -64,6 +64,8 @@ public slots:
     void showGoToDialog();
     /** @brief Jump to the home position on the map */
     void goHome();
+    /** @brief Jump to the last recorded position of an active UAS */
+    void lastPosition();
     /** @brief Update this waypoint for this UAS */
     void updateWaypoint(int uas, Waypoint* wp);
     /** @brief Update the whole waypoint */
@@ -118,7 +120,7 @@ public slots:
     }
 
     /** @brief Load the settings for this widget from disk */
-    void loadSettings(bool changePosition=true);
+    void loadSettings();
     /** @brief Store the settings for this widget to disk */
     void storeSettings();
 
@@ -128,6 +130,7 @@ protected slots:
 
 private:
     void sendGuidedAction(Waypoint *wp, double alt);
+    bool isValidGpsLocation(UASInterface* system) const;
 
 protected:
     /** @brief Update the highlighting of the currently controlled system */
@@ -167,6 +170,10 @@ protected:
     int defaultGuidedFrame;             ///< Default guided frame
     bool defaultGuidedAltFirstTimeSet;   ///< manages the first time set of guided alt
     UASInterface *uas;                  ///< Currently selected UAS.
+    // Atlantic Ocean near Africa, coordinate origin
+    double m_lastZoom;
+    double m_lastLat;
+    double m_lastLon;
 
 };
 

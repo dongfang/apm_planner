@@ -20,48 +20,50 @@ This file is part of the APM_PLANNER project
 
 ======================================================================*/
 
+#include <QsLog.h>
 #include "BasicPidConfig.h"
 #include "ParamWidget.h"
 
 BasicPidConfig::BasicPidConfig(QWidget *parent) : AP2ConfigWidget(parent)
 {
     ui.setupUi(this);
-    m_rPRCWidget = new ParamWidget("RollPitchRateControl",this);
-    ui.verticalLayout->addWidget(m_rPRCWidget);
-    connect(m_rPRCWidget,SIGNAL(doubleValueChanged(QString,double)),this,SLOT(rPRCValueChanged(QString,double)));
-    m_rPRCWidget->setupDouble(QString("Roll/Pitch Rate Control ") + "(" + "RATE_RLL_P/RATE_PIT_P/RATE_PIT_I" + ")","How much thrust is applied to rotate the copter at the desired speed",0,0.08,0.2,0.01);
-    m_rPRCWidget->show();
 
+    m_rollPitchRateWidget = new ParamWidget("RollPitchRateControl",this);
+    ui.verticalLayout->insertWidget(0,m_rollPitchRateWidget);
+    connect(m_rollPitchRateWidget,SIGNAL(doubleValueChanged(QString,double)),this,SLOT(rPRCValueChanged(QString,double)));
+    m_rollPitchRateWidget->setupDouble(QString("Roll/Pitch Rate Control"),
+                                       "Slide to the right if the copter is sluggish or slide to the left if the copter is twitchy.",0.15,0.08,0.4,0.01);
+    m_rollPitchRateWidget->show();
 
-    m_rPRDWidget = new ParamWidget("RollPitchRateDamp",this);
-    ui.verticalLayout->addWidget(m_rPRDWidget);
-    connect(m_rPRDWidget,SIGNAL(doubleValueChanged(QString,double)),this,SLOT(rPRDValueChanged(QString,double)));
-    m_rPRDWidget->setupDouble(QString("Roll/Pitch Rate Dampening ") + "(" + "RATE_PIT_D" + ")","How much dampening applies to the rate controller",0,0.001,0.008,0.0005);
-    m_rPRDWidget->show();
+    m_rcFeelWidget = new ParamWidget("RcFeelControl",this);
+    ui.verticalLayout->insertWidget(1,m_rcFeelWidget);
+    connect(m_rcFeelWidget,SIGNAL(intValueChanged(QString,int)),this,SLOT(rcFeelValueChanged(QString,int)));
+    m_rcFeelWidget->setupInt(QString("RC Feel"),
+        tr("RC feel for roll/pitch which controls vehicle response to user input with 0 being extremely soft and 100 being crisp.\nVery Soft=0   Soft=25   Medium=50   Crisp=75   Very Crisp=100")
+                                       ,50,0,100);
+    m_rcFeelWidget->show();
 
+    m_throttleHoverWidget = new ParamWidget("ThrottleHover",this);
+    ui.verticalLayout->insertWidget(2,m_throttleHoverWidget);
+    connect(m_throttleHoverWidget,SIGNAL(intValueChanged(QString,int)),this,SLOT(tHValueChanged(QString,int)));
+    m_throttleHoverWidget->setupInt(QString("Throttle Hover "),
+                                    "How much throttle is needed to maintain a steady hover.",480,300,700);
+    m_throttleHoverWidget->show();
 
-    m_yARCWidget = new ParamWidget("YawAngleRateControl",this);
-    ui.verticalLayout->addWidget(m_yARCWidget);
-    connect(m_yARCWidget,SIGNAL(doubleValueChanged(QString,double)),this,SLOT(yARCValueChanged(QString,double)));
-    m_yARCWidget->setupDouble(QString("Yaw Angular Rate Control ") + "(" + "RATE_YAW_I" + ")","How much thrust is applied to rotate the copter at the desired speed",0,0.08,0.4,0.01);
-    m_yARCWidget->show();
-
-    m_tAWidget = new ParamWidget("ThrottleAccel",this);
-    ui.verticalLayout->addWidget(m_tAWidget);
-    connect(m_tAWidget,SIGNAL(doubleValueChanged(QString,double)),this,SLOT(tAValueChanged(QString,double)));
-    m_tAWidget->setupDouble(QString("Throttle Accel ") + "(" + "THR_ACCEL_I" + ")","how much thrust to give us the desired accel. This will change depending on the weight and thrust of your copter",0,0.3,1.0,0.01);
-    m_tAWidget->show();
-
-    m_tHWidget = new ParamWidget("ThrottleHover",this);
-    ui.verticalLayout->addWidget(m_tHWidget);
-    connect(m_tHWidget,SIGNAL(intValueChanged(QString,int)),this,SLOT(tHValueChanged(QString,int)));
-    m_tHWidget->setupInt(QString("Throttle Hover ") + "(" + "THR_MID" + ")","How much throttle is needed to maintain a steady hover",480,200,800);
-    m_tHWidget->show();
+    m_throttleAccelWidget = new ParamWidget("ThrottleAccel",this);
+    ui.verticalLayout->insertWidget(3,m_throttleAccelWidget);
+    connect(m_throttleAccelWidget,SIGNAL(doubleValueChanged(QString,double)),this,SLOT(tAValueChanged(QString,double)));
+    m_throttleAccelWidget->setupDouble(QString("Throttle Accel"),
+                                       "Slide to the right to climb more aggressively or slide to the left to climb more gently.",0.75,0.3,1.0,0.05);
+    m_throttleAccelWidget->show();
 
     initConnections();
 }
+
 void BasicPidConfig::rPRCValueChanged(QString name,double value)
 {
+    Q_UNUSED(name);
+
     if (!m_uas)
     {
         showNullMAVErrorMessageBox();
@@ -73,30 +75,10 @@ void BasicPidConfig::rPRCValueChanged(QString name,double value)
     m_uas->getParamManager()->setParameter(1,"RATE_PIT_I",value);
 }
 
-void BasicPidConfig::rPRDValueChanged(QString name,double value)
-{
-    if (!m_uas)
-    {
-        showNullMAVErrorMessageBox();
-        return;
-    }
-    m_uas->getParamManager()->setParameter(1,"RATE_RLL_D",value);
-    m_uas->getParamManager()->setParameter(1,"RATE_PIT_D",value);
-}
-
-void BasicPidConfig::yARCValueChanged(QString name,double value)
-{
-    if (!m_uas)
-    {
-        showNullMAVErrorMessageBox();
-        return;
-    }
-    m_uas->getParamManager()->setParameter(1,"RATE_YAW_P",value);
-    m_uas->getParamManager()->setParameter(1,"RATE_RAW_I",value * 0.1);
-}
-
 void BasicPidConfig::tAValueChanged(QString name,double value)
 {
+    Q_UNUSED(name);
+
     if (!m_uas)
     {
         showNullMAVErrorMessageBox();
@@ -105,8 +87,11 @@ void BasicPidConfig::tAValueChanged(QString name,double value)
     m_uas->getParamManager()->setParameter(1,"THR_ACCEL_P",value);
     m_uas->getParamManager()->setParameter(1,"THR_ACCEL_I",value*2.0);
 }
+
 void BasicPidConfig::tHValueChanged(QString name,int value)
 {
+    Q_UNUSED(name);
+
     if (!m_uas)
     {
         showNullMAVErrorMessageBox();
@@ -115,29 +100,50 @@ void BasicPidConfig::tHValueChanged(QString name,int value)
     m_uas->getParamManager()->setParameter(1,"THR_MID",value);
 }
 
+void BasicPidConfig::rcFeelValueChanged(QString name, int value)
+{
+    Q_UNUSED(name);
+
+    if (!m_uas)
+    {
+        showNullMAVErrorMessageBox();
+        return;
+    }
+    m_uas->getParamManager()->setParameter(1,"RC_FEEL_RP",value);
+}
+
 BasicPidConfig::~BasicPidConfig()
 {
 }
+
 void BasicPidConfig::parameterChanged(int uas, int component, QString parameterName, QVariant value)
 {
+    Q_UNUSED(uas);
+    Q_UNUSED(component);
+
     if (parameterName == "RATE_RLL_P")
     {
-        m_rPRCWidget->setValue(value.toDouble());
+        QLOG_DEBUG() << "BasicPID: RATE_RLL_P:" << value.toDouble();
+        m_rollPitchRateWidget->setValue(value.toDouble());
     }
     else if (parameterName == "RATE_RLL_D")
     {
-        m_rPRDWidget->setValue(value.toDouble());
-    }
-    else if (parameterName == "RATE_YAW_P")
-    {
-        m_yARCWidget->setValue(value.toDouble());
+        QLOG_DEBUG() << "BasicPID: RATE_RLL_D:" << value.toDouble();
+        m_rollPitchRateWidget->setValue(value.toDouble());
     }
     else if (parameterName == "THR_ACCEL_P")
     {
-        m_tAWidget->setValue(value.toDouble());
+         QLOG_DEBUG() << "BasicPID: THR_ACCEL_P:" << value.toDouble();
+        m_throttleAccelWidget->setValue(value.toDouble());
     }
     else if (parameterName == "THR_MID")
     {
-        m_tHWidget->setValue(value.toInt());
+         QLOG_DEBUG() << "BasicPID: THR_MID:" << value.toInt();
+        m_throttleHoverWidget->setValue(value.toInt());
+    }
+    else if (parameterName == "RC_FEEL_RP")
+    {
+        QLOG_DEBUG() << "BasicPID: RC_FEEL:" << value.toInt();
+        m_rcFeelWidget->setValue(value.toInt());
     }
 }

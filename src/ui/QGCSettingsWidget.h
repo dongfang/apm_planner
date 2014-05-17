@@ -1,6 +1,7 @@
 #ifndef QGCSETTINGSWIDGET_H
 #define QGCSETTINGSWIDGET_H
 
+#include "UASInterface.h"
 #include <QDialog>
 
 namespace Ui
@@ -17,11 +18,22 @@ public:
     ~QGCSettingsWidget();
 protected:
     void showEvent(QShowEvent *evt);
-public slots:
+private slots:
+    void setLogDir();
+    void setMAVLinkLogDir();
+    void setParamDir();
+    void setAppDataDir();
+    void ratesChanged();
+
+    void setActiveUAS(UASInterface *uas);
+
+private:
+    void setDataRateLineEdits();
 
 private:
     Ui::QGCSettingsWidget *ui;
     bool m_init;
+    UASInterface *m_uas;
 };
 
 #endif // QGCSETTINGSWIDGET_H

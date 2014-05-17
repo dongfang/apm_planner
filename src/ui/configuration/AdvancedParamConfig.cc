@@ -28,6 +28,7 @@ AdvancedParamConfig::AdvancedParamConfig(QWidget *parent) : AP2ConfigWidget(pare
 {
     ui.setupUi(this);
     initConnections();
+    connect(ui.searchFilter, SIGNAL(textChanged(QString)), this, SLOT(onSearchFilterChanged(const QString &)));
 }
 
 AdvancedParamConfig::~AdvancedParamConfig()
@@ -43,6 +44,11 @@ void AdvancedParamConfig::addRange(QString title,QString description,QString par
     ui.verticalLayout->addWidget(widget);
     widget->installEventFilter(QGCMouseWheelEventFilter::getFilter());
     widget->show();
+    if (m_paramToValueMap.contains(param))
+    {
+        widget->setValue(m_paramToValueMap.value(param).toDouble());
+        m_paramToValueMap.remove(param);
+    }
 }
 
 void AdvancedParamConfig::addCombo(QString title,QString description,QString param,QList<QPair<int,QString> > valuelist)
@@ -55,7 +61,18 @@ void AdvancedParamConfig::addCombo(QString title,QString description,QString par
     ui.verticalLayout->addWidget(widget);
     widget->installEventFilter(QGCMouseWheelEventFilter::getFilter());
     widget->show();
+    if (m_paramToValueMap.contains(param))
+    {
+        widget->setValue(m_paramToValueMap.value(param).toDouble());
+        m_paramToValueMap.remove(param);
+    }
 }
+
+void AdvancedParamConfig::allParamsAdded(void)
+{
+    ui.verticalLayout->addStretch();
+}
+
 void AdvancedParamConfig::parameterChanged(int uas, int component, QString parameterName, QVariant value)
 {
     if (m_paramToWidgetMap.contains(parameterName))
@@ -68,6 +85,10 @@ void AdvancedParamConfig::parameterChanged(int uas, int component, QString param
         {
             m_paramToWidgetMap[parameterName]->setValue(value.toInt());
         }
+    }
+    else
+    {
+        m_paramToValueMap[parameterName] = value;
     }
 }
 void AdvancedParamConfig::doubleValueChanged(QString param,double value)
@@ -86,4 +107,36 @@ void AdvancedParamConfig::intValueChanged(QString param,int value)
         this->showNullMAVErrorMessageBox();
     }
     m_uas->getParamManager()->setParameter(1,param,value);
+}
+
+void AdvancedParamConfig::onSearchFilterChanged(const QString &searchFilterText)
+{
+    if (searchFilterText.isEmpty())
+    {
+        for (int i = 0; i < ui.verticalLayout->count(); ++i)
+        {
+            QLayoutItem *item = ui.verticalLayout->itemAt(i);
+            if (item && item->widget())
+            {
+                item->widget()->setVisible(true);
+            }
+        }
+    }
+    else
+    {
+        QStringList filterList = searchFilterText.toLower().split(' ', QString::SkipEmptyParts);
+        for (int i = 0; i < ui.verticalLayout->count(); ++i)
+        {
+            ParamWidget *pw = qobject_cast<ParamWidget *>(ui.verticalLayout->itemAt(i)->widget());
+            if (pw)
+            {
+                bool shouldShow = true;
+                foreach (const QString &filterTerm, filterList)
+                {
+                    shouldShow = shouldShow && pw->matchesSearchFilter(filterTerm);
+                }
+                pw->setVisible(shouldShow);
+            }
+        }
+    }
 }

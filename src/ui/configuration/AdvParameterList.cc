@@ -21,6 +21,8 @@ This file is part of the APM_PLANNER project
 ======================================================================*/
 
 #include "AdvParameterList.h"
+#include "DownloadRemoteParamsDialog.h"
+#include "ParamCompareDialog.h"
 #include "QsLog.h"
 #include <QTableWidgetItem>
 #include <QInputDialog>
@@ -28,55 +30,82 @@ This file is part of the APM_PLANNER project
 #include <QFile>
 #include <QMessageBox>
 #include <QProgressDialog>
+#include <QDesktopServices>
+
+#define ADV_TABLE_COLUMN_PARAM 0
+#define ADV_TABLE_COLUMN_VALUE 1
+#define ADV_TABLE_COLUMN_UNIT 2
+#define ADV_TABLE_COLUMN_RANGE 3
+#define ADV_TABLE_COLUMN_DESCRIPTION 4
+#define ADV_TABLE_COLUMN_COUNT ADV_TABLE_COLUMN_DESCRIPTION + 1
 
 AdvParameterList::AdvParameterList(QWidget *parent) : AP2ConfigWidget(parent),
     m_paramDownloadState(starting),
     m_paramDownloadCount(0),
     m_writingParams(false),
     m_paramsWritten(0),
-    m_paramsToWrite(0)
+    m_paramsToWrite(0),
+    m_searchIndex(0)
 {
     ui.setupUi(this);
-    connect(ui.refreshPushButton,SIGNAL(clicked()),this,SLOT(refreshButtonClicked()));
-    connect(ui.writePushButton,SIGNAL(clicked()),this,SLOT(writeButtonClicked()));
-    connect(ui.loadPushButton,SIGNAL(clicked()),this,SLOT(loadButtonClicked()));
-    connect(ui.savePushButton,SIGNAL(clicked()),this,SLOT(saveButtonClicked()));
-    connect(ui.tableWidget,SIGNAL(itemChanged(QTableWidgetItem*)),this,SLOT(tableWidgetItemChanged(QTableWidgetItem*)));
+    connect(ui.refreshPushButton, SIGNAL(clicked()),this, SLOT(refreshButtonClicked()));
+    connect(ui.writePushButton, SIGNAL(clicked()),this, SLOT(writeButtonClicked()));
+    connect(ui.loadPushButton, SIGNAL(clicked()),this, SLOT(loadButtonClicked()));
+    connect(ui.savePushButton, SIGNAL(clicked()),this, SLOT(saveButtonClicked()));
+    connect(ui.tableWidget, SIGNAL(itemChanged(QTableWidgetItem*)),
+            this, SLOT(tableWidgetItemChanged(QTableWidgetItem*)));
+    connect(ui.downloadRemoteButton, SIGNAL(clicked()),this, SLOT(downloadRemoteFiles()));
+    connect(ui.compareButton,SIGNAL(clicked()),this, SLOT(compareButtonClicked()));
 
-    ui.tableWidget->setColumnCount(4);
+    connect(ui.searchLineEdit, SIGNAL(textEdited(QString)), this, SLOT(findStringInTable(QString)));
+    connect(ui.nextItemButton, SIGNAL(clicked()), this, SLOT(nextItemInSearch()));
+    connect(ui.previousItemButton, SIGNAL(clicked()), this, SLOT(previousItemInSearch()));
+
+
+    ui.tableWidget->setColumnCount(ADV_TABLE_COLUMN_COUNT);
     ui.tableWidget->verticalHeader()->hide();
-    ui.tableWidget->setColumnWidth(0,200);
-    ui.tableWidget->setColumnWidth(1,100);
-    ui.tableWidget->setColumnWidth(2,100);
-    ui.tableWidget->setColumnWidth(3,800);
-    ui.tableWidget->setHorizontalHeaderItem(0,new QTableWidgetItem("Param"));
-    ui.tableWidget->setHorizontalHeaderItem(1,new QTableWidgetItem("Value"));
-    ui.tableWidget->setHorizontalHeaderItem(2,new QTableWidgetItem("Unit"));
-    ui.tableWidget->setHorizontalHeaderItem(3,new QTableWidgetItem("Description"));
-    ui.tableWidget->horizontalHeaderItem (3)->setTextAlignment(Qt::AlignLeft);
+    ui.tableWidget->setColumnWidth(ADV_TABLE_COLUMN_PARAM,200);
+    ui.tableWidget->setColumnWidth(ADV_TABLE_COLUMN_VALUE,100);
+    ui.tableWidget->setColumnWidth(ADV_TABLE_COLUMN_UNIT,100);
+    ui.tableWidget->setColumnWidth(ADV_TABLE_COLUMN_DESCRIPTION,800);
+    ui.tableWidget->setHorizontalHeaderItem(ADV_TABLE_COLUMN_PARAM, new QTableWidgetItem("Param"));
+    ui.tableWidget->setHorizontalHeaderItem(ADV_TABLE_COLUMN_VALUE, new QTableWidgetItem("Value"));
+    ui.tableWidget->setHorizontalHeaderItem(ADV_TABLE_COLUMN_UNIT, new QTableWidgetItem("Unit"));
+    ui.tableWidget->setHorizontalHeaderItem(ADV_TABLE_COLUMN_RANGE, new QTableWidgetItem("Range"));
+    ui.tableWidget->setHorizontalHeaderItem(ADV_TABLE_COLUMN_DESCRIPTION,new QTableWidgetItem("Description"));
+    ui.tableWidget->horizontalHeaderItem(ADV_TABLE_COLUMN_DESCRIPTION)->setTextAlignment(Qt::AlignLeft);
 
-    ui.paramProgressBar->setRange(0,100);
+    ui.paramProgressBar->setRange(0,0);
+    ui.paramProgressBar->hide();
+    ui.progressLabel->hide();
 
     initConnections();
 }
 void AdvParameterList::tableWidgetItemChanged(QTableWidgetItem* item)
 {
-	if (!ui.tableWidget->item(item->row(),1) || !ui.tableWidget->item(item->row(),0))
+    if (!ui.tableWidget->item(item->row(),ADV_TABLE_COLUMN_VALUE)
+            || !ui.tableWidget->item(item->row(),ADV_TABLE_COLUMN_PARAM))
     {
         //Invalid item, something has gone awry.
         return;
     }
-    m_origBrushList.append(ui.tableWidget->item(item->row(),0)->text());
+    m_origBrushList.append(ui.tableWidget->item(item->row(),ADV_TABLE_COLUMN_PARAM)->text());
     QBrush brush = QBrush(QColor::fromRgb(132,181,132));
-    item->setBackground(brush);
-    ui.tableWidget->item(item->row(),0)->setBackground(brush);
-    m_modifiedParamMap[ui.tableWidget->item(item->row(),0)->text()] = item->text().toDouble();
+    ui.tableWidget->item(item->row(),ADV_TABLE_COLUMN_PARAM)->setBackground(brush);
+    ui.tableWidget->item(item->row(),ADV_TABLE_COLUMN_VALUE)->setBackground(brush);
+    ui.tableWidget->item(item->row(),ADV_TABLE_COLUMN_UNIT)->setBackground(brush);
+    ui.tableWidget->item(item->row(),ADV_TABLE_COLUMN_RANGE)->setBackground(brush);
+    ui.tableWidget->item(item->row(),ADV_TABLE_COLUMN_DESCRIPTION)->setBackground(brush);
+    m_modifiedParamMap[ui.tableWidget->item(item->row(),ADV_TABLE_COLUMN_PARAM)->text()] = item->text().toDouble();
 
     int itemsChanged = m_modifiedParamMap.size();
 
     QString str;
     str.sprintf("%d %s changed", itemsChanged, (itemsChanged == 1)? "param": "params");
     ui.progressLabel->setText(str);
+    ui.paramProgressBar->setMaximum(itemsChanged);
+    ui.progressLabel->show();
+    ui.paramProgressBar->show();
 }
 
 void AdvParameterList::writeButtonClicked()
@@ -100,8 +129,10 @@ void AdvParameterList::writeButtonClicked()
     m_paramsWritten = 0;
 
     if(m_paramsToWrite == 0) {
-        ui.paramProgressBar->setValue(100);
+        ui.paramProgressBar->setValue(0);
         ui.progressLabel->setText("No params to write");
+        ui.progressLabel->show();
+        QTimer::singleShot(700,ui.progressLabel, SLOT(hide()));
     }
 
     m_modifiedParamMap.clear();
@@ -127,11 +158,14 @@ void AdvParameterList::refreshButtonClicked()
     m_paramDownloadState = starting;
 }
 
-void AdvParameterList::setParameterMetaData(QString name,QString humanname,QString description,QString unit)
+void AdvParameterList::setParameterMetaData(const QString &name, const QString &humanname,
+                                            const QString &description, const QString &unit,
+                                            const QString &range)
 {
     m_paramToNameMap[name] = humanname;
     m_paramToDescriptionMap[name] = description;
     m_paramToUnitMap[name] = unit;
+    m_paramToRangeMap[name] = range;
 }
 void AdvParameterList::loadButtonClicked()
 {
@@ -141,7 +175,8 @@ void AdvParameterList::loadButtonClicked()
         return;
     }
 
-    QString filename = QFileDialog::getOpenFileName(this,"Open File");
+    QString filename = QFileDialog::getOpenFileName(this,"Open File", QGC::parameterDirectory());
+    QApplication::processEvents(); // Helps clear dialog from screen
 
     if(filename.length() == 0)
     {
@@ -157,34 +192,29 @@ void AdvParameterList::loadButtonClicked()
 
     QString filestr = file.readAll();
     file.close();
-    QStringList filesplit = filestr.split("\r\n");
 
-    ui.progressLabel->setText("File loaded");
+    ParamCompareDialog::populateParamListFromString(filestr, &m_parameterList, this);
 
-    foreach (QString fileline,filesplit)
-    {
-        if (fileline.startsWith("#"))
-        {
-            //Comment
-        }
-        else
-        {
-            QStringList linesplit = fileline.split(",");
-            if (linesplit.size() == 2)
-            {
-                if (m_paramValueMap.contains(linesplit[0]))
-                {
-                    m_paramValueMap[linesplit[0]]->setText(linesplit[1]);
+    foreach(UASParameter* param, m_parameterList){
+        // Modify the elements in the table widget.
+        if (param->isModified()){
+            // Update the local table widget
+            QTableWidgetItem* item = m_paramValueMap.value(param->name());
+            if (item){
+                if (param->value() != item->data(Qt::DisplayRole)){
+                    item->setData(Qt::DisplayRole, param->value());
+                    tableWidgetItemChanged(item);
                 }
-
             }
         }
     }
+
 }
 
 void AdvParameterList::saveButtonClicked()
 {
-    QString filename = QFileDialog::getSaveFileName(this,"Save File");
+    QString filename = QFileDialog::getSaveFileName(this,"Save File", QGC::parameterDirectory());
+    QApplication::processEvents(); // Helps clear dialog from screen
 
     if(filename.length() == 0)
     {
@@ -210,7 +240,7 @@ void AdvParameterList::saveButtonClicked()
         m_uas->getParamManager()->getParameterValue(1,paramnamelist[i],value);
         if (value.type() == QVariant::Double || value.type() == QMetaType::Float)
         {
-            file.write(paramnamelist[i].append(",").append(QString::number(value.toDouble(),'f',6)).append("\r\n").toAscii());
+            file.write(paramnamelist[i].append(",").append(QString::number(value.toFloat(),'f',8)).append("\r\n").toAscii());
         }
         else
         {
@@ -221,7 +251,7 @@ void AdvParameterList::saveButtonClicked()
     file.close();
 }
 
-void AdvParameterList::parameterChanged(int uas, int component, QString parameterName, QVariant value)
+void AdvParameterList::parameterChanged(int /*uas*/, int /*component*/, QString parameterName, QVariant value)
 {
     QLOG_DEBUG() << "APL::parameterChanged " << parameterName << ":" <<value.toFloat();
     disconnect(ui.tableWidget,SIGNAL(itemChanged(QTableWidgetItem*)),this,SLOT(tableWidgetItemChanged(QTableWidgetItem*)));
@@ -229,12 +259,12 @@ void AdvParameterList::parameterChanged(int uas, int component, QString paramete
     {
         ui.tableWidget->setRowCount(ui.tableWidget->rowCount()+1);
 
-        //Col 0, param name
+        //Param name
         QTableWidgetItem *paramnameitem = new QTableWidgetItem(parameterName);
         paramnameitem->setFlags(paramnameitem->flags() ^ Qt::ItemIsEditable);
-        ui.tableWidget->setItem(ui.tableWidget->rowCount()-1,0,paramnameitem);
+        ui.tableWidget->setItem(ui.tableWidget->rowCount()-1,ADV_TABLE_COLUMN_PARAM,paramnameitem);
 
-        //Col 1, param value
+        // Param value
         QString valstr = "";
         if (value.type() == QMetaType::Float || value.type() == QVariant::Double)
         {
@@ -246,23 +276,37 @@ void AdvParameterList::parameterChanged(int uas, int component, QString paramete
         }
         QTableWidgetItem *valitem = new QTableWidgetItem(valstr);
         valitem->setFlags(valitem->flags() | Qt::ItemIsEditable);
-        ui.tableWidget->setItem(ui.tableWidget->rowCount()-1,1,valitem);
+        ui.tableWidget->setItem(ui.tableWidget->rowCount()-1,ADV_TABLE_COLUMN_VALUE,valitem);
 
-        //Col 2, param unit
+        // Param unit
         if (m_paramToUnitMap.contains(parameterName))
         {
             QTableWidgetItem *item = new QTableWidgetItem(m_paramToUnitMap[parameterName]);
             item->setFlags(item->flags() ^ Qt::ItemIsEditable);
-            ui.tableWidget->setItem(ui.tableWidget->rowCount()-1,2,item);
+            ui.tableWidget->setItem(ui.tableWidget->rowCount()-1, ADV_TABLE_COLUMN_UNIT,item);
         }
         else
         {
             QTableWidgetItem *item = new QTableWidgetItem("");
             item->setFlags(item->flags() ^ Qt::ItemIsEditable);
-            ui.tableWidget->setItem(ui.tableWidget->rowCount()-1,2,item);
+            ui.tableWidget->setItem(ui.tableWidget->rowCount()-1,ADV_TABLE_COLUMN_UNIT,item);
         }
 
-        //Col 3, description
+        // Param range
+        if (m_paramToRangeMap.contains(parameterName))
+        {
+            QTableWidgetItem *item = new QTableWidgetItem(m_paramToRangeMap[parameterName]);
+            item->setFlags(item->flags() ^ Qt::ItemIsEditable);
+            ui.tableWidget->setItem(ui.tableWidget->rowCount()-1, ADV_TABLE_COLUMN_RANGE,item);
+        }
+        else
+        {
+            QTableWidgetItem *item = new QTableWidgetItem("");
+            item->setFlags(item->flags() ^ Qt::ItemIsEditable);
+            ui.tableWidget->setItem(ui.tableWidget->rowCount()-1,ADV_TABLE_COLUMN_RANGE,item);
+        }
+
+        // Description
         QString desc = "";
         if (m_paramToNameMap.contains(parameterName))
         {
@@ -279,17 +323,21 @@ void AdvParameterList::parameterChanged(int uas, int component, QString paramete
         }
         QTableWidgetItem *item = new QTableWidgetItem(desc);
         item->setFlags(item->flags() ^ Qt::ItemIsEditable);
-        ui.tableWidget->setItem(ui.tableWidget->rowCount()-1,3,item);
+        ui.tableWidget->setItem(ui.tableWidget->rowCount()-1,ADV_TABLE_COLUMN_DESCRIPTION,item);
 
 
-        m_paramValueMap[parameterName] = ui.tableWidget->item(ui.tableWidget->rowCount()-1,1);
+        m_paramValueMap[parameterName] = ui.tableWidget->item(ui.tableWidget->rowCount()-1,ADV_TABLE_COLUMN_VALUE);
         ui.tableWidget->sortByColumn(0,Qt::AscendingOrder);
     }
 
     if (m_origBrushList.contains(parameterName))
     {
         m_paramValueMap[parameterName]->setBackground(QBrush());
-    ui.tableWidget->item(m_paramValueMap[parameterName]->row(),0)->setBackground(QBrush());
+        ui.tableWidget->item(m_paramValueMap[parameterName]->row(),ADV_TABLE_COLUMN_PARAM)->setBackground(QBrush());
+        ui.tableWidget->item(m_paramValueMap[parameterName]->row(),ADV_TABLE_COLUMN_VALUE)->setBackground(QBrush());
+        ui.tableWidget->item(m_paramValueMap[parameterName]->row(),ADV_TABLE_COLUMN_UNIT)->setBackground(QBrush());
+        ui.tableWidget->item(m_paramValueMap[parameterName]->row(),ADV_TABLE_COLUMN_RANGE)->setBackground(QBrush());
+        ui.tableWidget->item(m_paramValueMap[parameterName]->row(),ADV_TABLE_COLUMN_DESCRIPTION)->setBackground(QBrush());
         m_origBrushList.removeAll(parameterName);
     }
 
@@ -307,67 +355,156 @@ void AdvParameterList::parameterChanged(int uas, int component, QString paramete
 
     if(m_writingParams) {
         ++m_paramsWritten;
-        float written = static_cast<float>(m_paramsWritten);
-        float toWrite = static_cast<float>(m_paramsToWrite);
-        float pct = ((written / toWrite) * 100.0f);
 
         QString str;
 
-        if(written >= toWrite) {
+        if(m_paramsWritten >= m_paramsToWrite) {
             str.sprintf("%d params written", m_paramsWritten);
             m_writingParams = false;
+            QTimer::singleShot(500,ui.progressLabel, SLOT(hide()));
+            QTimer::singleShot(500,ui.paramProgressBar, SLOT(hide()));
         }
         else {
             str.sprintf("%d of %d", m_paramsWritten, m_paramsToWrite);
         }
 
         ui.progressLabel->setText(str);
-        ui.paramProgressBar->setValue((int)pct);
+        ui.paramProgressBar->setValue(m_paramsWritten);
     }
 }
 
 void AdvParameterList::parameterChanged(int uas, int component, int parameterCount, int parameterId, QString parameterName, QVariant value)
 {
-    QString countString;
-    // Create progress of downloading all parameters for UI
-    switch (m_paramDownloadState){
-    case starting:
-        QLOG_INFO() << "Starting Param Progress Bar Updating sys:" << uas;
-        m_paramDownloadCount = 1;
+    // Create a parameter list model for comparison feature
+    // [TODO] This needs to move to the global parameter model.
 
-        countString = QString::number(m_paramDownloadCount) + "/"
-                        + QString::number(parameterCount);
-        QLOG_INFO() << "Param Progress Bar: " << countString
-                     << "paramId:" << parameterId << "name:" << parameterName
-                     << "paramValue:" << value;
-        ui.progressLabel->setText(countString);
-        ui.paramProgressBar->setValue((m_paramDownloadCount/(float)parameterCount)*100.0);
-
-        m_paramDownloadState = refreshing;
-        break;
-
-    case refreshing:
-        m_paramDownloadCount++;
-        countString = QString::number(m_paramDownloadCount) + "/"
-                        + QString::number(parameterCount);
-        QLOG_INFO() << "Param Progress Bar: " << countString
-                     << "paramId:" << parameterId << "name:" << parameterName
-                     << "paramValue:" << value;
-        ui.progressLabel->setText(countString);
-        ui.paramProgressBar->setValue((m_paramDownloadCount/(float)parameterCount)*100.0);
-
-        if (m_paramDownloadCount == parameterCount)
-            m_paramDownloadState = completed;
-        break;
-
-    case completed:
-        QLOG_INFO() << "Finished Downloading Params" << m_paramDownloadCount;
-        m_paramDownloadState = none;
-        break;
-
-    case none:
-    default:
-        ; // Do Nothing
+    if (m_parameterList.contains(parameterName)){
+        UASParameter* param = m_parameterList.value(parameterName);
+        param->setValue(value); // This also sets the modified bit
+    } else {
+        // create a new entry
+        UASParameter* param = new UASParameter(parameterName,component,value,parameterId);
+        m_parameterList.insert(parameterName, param);
     }
 }
 
+void AdvParameterList::downloadRemoteFiles()
+{
+    QLOG_DEBUG() << "DownloadRemoteFiles";
+
+    DownloadRemoteParamsDialog* dialog = new DownloadRemoteParamsDialog(this, true);
+
+    if(dialog->exec() == QDialog::Accepted) {
+        // Pull the selected file and
+        // modify the parameters on the adv param list.
+        QLOG_DEBUG() << "Remote File Downloaded";
+        QLOG_DEBUG() << "TODO: Trigger auto load or compare of the downloaded file";
+
+        // Bring up the compare dialog
+        m_paramFileToCompare = dialog->getDownloadedFileName();
+        QTimer::singleShot(300, this, SLOT(compareButtonClicked()));
+    }
+    dialog->deleteLater();
+    dialog = NULL;
+}
+
+void AdvParameterList::updateTableWidgetElements(QMap<QString, UASParameter *> &parameterList)
+{
+    foreach(UASParameter* param, parameterList){
+        // Modify the elements in the table widget.
+        if (param->isModified()){
+            // Update the local table widget
+            QTableWidgetItem* item = m_paramValueMap.value(param->name());
+            if (item){
+                if(param->value().toDouble() != item->data(Qt::DisplayRole).toDouble()){
+                    item->setData(Qt::DisplayRole, param->value());
+                    tableWidgetItemChanged(item);
+                }
+            }
+        }
+    }
+}
+
+void AdvParameterList::compareButtonClicked()
+{
+    QLOG_DEBUG() << "Compare Params to File";
+
+    ParamCompareDialog* dialog = new ParamCompareDialog(m_parameterList, m_paramFileToCompare, this);
+
+    if(dialog->exec() == QDialog::Accepted) {
+        // Apply the selected parameters
+        // [TODO] For now just scan the returned new list and update the advanced tableview
+        updateTableWidgetElements(m_parameterList);
+    }
+    m_paramFileToCompare = ""; // clear any previous filenames
+    dialog->deleteLater();
+    dialog = NULL;
+}
+
+void AdvParameterList::findStringInTable(const QString &searchString)
+{
+    QLOG_DEBUG() << "Find String in table: " << searchString;
+
+    // Don't want the items to be considered changed
+    disconnect(ui.tableWidget, SIGNAL(itemChanged(QTableWidgetItem*)),
+            this, SLOT(tableWidgetItemChanged(QTableWidgetItem*)));
+
+    if (m_searchItemList.count() > 0){
+       foreach(QTableWidgetItem *item, m_searchItemList){
+            item->setBackground(QBrush());
+            item->setSelected(false);
+       }
+    }
+
+    m_searchItemList.clear();
+    if (searchString.length() > 2){ //need at least three characters to search
+        m_searchItemList = ui.tableWidget->findItems(searchString, Qt::MatchContains);
+    }
+
+    if (m_searchItemList.count() > 0){
+        foreach(QTableWidgetItem *item, m_searchItemList){
+            item->setBackgroundColor(QColor(255,255,160));
+        }
+        m_searchIndex = m_searchIndex < m_searchItemList.count()? m_searchIndex
+                                                                : m_searchItemList.count() - 1;
+        ui.tableWidget->scrollToItem(m_searchItemList[m_searchIndex],QAbstractItemView::PositionAtCenter);
+        m_searchItemList[m_searchIndex]->setSelected(true);
+    }
+
+    // Reconnect changed signal
+    connect(ui.tableWidget, SIGNAL(itemChanged(QTableWidgetItem*)),
+            this, SLOT(tableWidgetItemChanged(QTableWidgetItem*)));
+}
+
+void AdvParameterList::nextItemInSearch()
+{
+    QLOG_DEBUG() << "Find Next Item in table: ";
+    if (m_searchItemList.count()==0)
+        return;
+
+    m_searchItemList[m_searchIndex]->setSelected(false);
+    m_searchIndex++;
+    if(m_searchIndex < m_searchItemList.count()){
+        ui.tableWidget->scrollToItem(m_searchItemList[m_searchIndex],QAbstractItemView::PositionAtCenter);
+        m_searchItemList[m_searchIndex]->setSelected(true);
+    } else {
+        m_searchIndex = 0; // loop around
+    }
+}
+
+void AdvParameterList::previousItemInSearch()
+{
+    QLOG_DEBUG() << "Find Previous Item in table: ";
+
+    if (m_searchItemList.count()==0)
+        return;
+
+    m_searchItemList[m_searchIndex]->setSelected(false);
+    m_searchIndex--;
+    if(m_searchIndex >= 0){
+        ui.tableWidget->scrollToItem(m_searchItemList[m_searchIndex],QAbstractItemView::PositionAtCenter);
+        m_searchItemList[m_searchIndex]->setSelected(true);
+    } else {
+        m_searchIndex = m_searchItemList.count() - 1; // loops around
+    }
+}

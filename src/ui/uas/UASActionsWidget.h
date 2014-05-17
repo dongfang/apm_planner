@@ -13,6 +13,8 @@ public:
     explicit UASActionsWidget(QWidget *parent = 0);
     ~UASActionsWidget();
 
+    void contextMenuEvent(QContextMenuEvent *event);
+
 private slots:
     void activeUASSet(UASInterface *uas);
     void uasConnected();
@@ -32,6 +34,7 @@ private slots:
 
     void parameterChanged(int uas, int component, int parameterCount,
                           int parameterId, QString parameterName, QVariant value);
+    void heartbeatReceived(UASInterface*);
 
 private:
     void setupApmCopterModes();
@@ -45,6 +48,12 @@ private:
     bool activeUas();
 
     int preFlightWarningBox();
+    int modeChangeWarningBox(const QString& modeString);
+
+    void configureModeButtonEnableDisable();
+
+    void saveApmSettings();
+    void loadApmSettings();
 
 private:
     Ui::UASActionsWidget ui;

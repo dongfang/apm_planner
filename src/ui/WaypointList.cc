@@ -204,14 +204,16 @@ void WaypointList::setUAS(UASInterface* uas)
 void WaypointList::saveWaypoints()
 {
 
-    QString fileName = QFileDialog::getSaveFileName(this, tr("Save File"), "./waypoints.txt", tr("Waypoint File (*.txt)"));
+    QString fileName = QFileDialog::getSaveFileName(this, tr("Save File"), QGC::appDataDirectory(), tr("Waypoint File (*.txt)"));
+    QApplication::processEvents(); // Removes the dialog from screen
     WPM->saveWaypoints(fileName);
 
 }
 
 void WaypointList::loadWaypoints()
 {
-    QString fileName = QFileDialog::getOpenFileName(this, tr("Load File"), ".", tr("Waypoint File (*.txt)"));
+    QString fileName = QFileDialog::getOpenFileName(this, tr("Load File"), QGC::appDataDirectory(), tr("Waypoint File (*.txt)"));
+    QApplication::processEvents(); // Removes the dialog from screen
     WPM->loadWaypoints(fileName);
 }
 
@@ -256,22 +258,21 @@ void WaypointList::addEditable(bool onCurrentPosition)
         Waypoint *last = waypoints.last();
         wp = WPM->createWaypoint();
 //        wp->blockSignals(true);
-        MAV_FRAME frame = (MAV_FRAME)last->getFrame();
+        MAV_FRAME frame = static_cast<MAV_FRAME>(WPM->getFrameRecommendation());
         wp->setFrame(frame);
         if (frame == MAV_FRAME_GLOBAL || frame == MAV_FRAME_GLOBAL_RELATIVE_ALT)
         {
             wp->setLatitude(last->getLatitude());
             wp->setLongitude(last->getLongitude());
-            wp->setAltitude(last->getAltitude());
         } else {
             wp->setX(last->getX());
             wp->setY(last->getY());
             wp->setZ(last->getZ());
         }
         wp->setParam1(last->getParam1());
-        wp->setParam1(last->getParam2());
-        wp->setParam1(last->getParam3());
-        wp->setParam1(last->getParam4());
+        wp->setParam2(last->getParam2());
+        wp->setParam3(last->getParam3());
+        wp->setParam4(last->getParam4());
         wp->setAutocontinue(last->getAutoContinue());
 //        wp->blockSignals(false);
         wp->setAction(last->getAction());
@@ -279,6 +280,7 @@ void WaypointList::addEditable(bool onCurrentPosition)
     }
     else
     {
+        // [TODO] for APM should trigger a read if no WP0 exists.
         if (uas)
         {
             // Create first waypoint at current MAV position
@@ -286,13 +288,15 @@ void WaypointList::addEditable(bool onCurrentPosition)
             {
                 if (onCurrentPosition)
                 {
-
+                    double alt;
                     if (WPM->getFrameRecommendation() == MAV_FRAME_GLOBAL) {
                         updateStatusLabel(tr("Added default GLOBAL (Abs alt.) waypoint."));
+                        alt = uas->getAltitudeAMSL();
                     } else {
                         updateStatusLabel(tr("Added default GLOBAL (Relative alt.) waypoint."));
+                        alt = uas->getAltitudeRelative();
                     }
-                    wp = new Waypoint(0, uas->getLatitude(), uas->getLongitude(), uas->getAltitude(), 0, WPM->getAcceptanceRadiusRecommendation(), 0, 0,true, true, (MAV_FRAME)WPM->getFrameRecommendation(), MAV_CMD_NAV_WAYPOINT);
+                    wp = new Waypoint(0, uas->getLatitude(), uas->getLongitude(), alt, 0, WPM->getAcceptanceRadiusRecommendation(), 0, 0,true, true, (MAV_FRAME)WPM->getFrameRecommendation(), MAV_CMD_NAV_WAYPOINT);
                     WPM->addWaypointEditable(wp);
 
                 } else {
@@ -304,7 +308,10 @@ void WaypointList::addEditable(bool onCurrentPosition)
                     }
                     wp = new Waypoint(0, UASManager::instance()->getHomeLatitude(),
                                       UASManager::instance()->getHomeLongitude(),
-                                      WPM->getAltitudeRecommendation(), 0, WPM->getAcceptanceRadiusRecommendation(), 0, 0,true, true, (MAV_FRAME)WPM->getFrameRecommendation(), MAV_CMD_NAV_WAYPOINT);
+                                      WPM->getAltitudeRecommendation((MAV_FRAME)WPM->getFrameRecommendation()),
+                                      0,
+                                      WPM->getAcceptanceRadiusRecommendation(), 0, 0,true, true,
+                                      (MAV_FRAME)WPM->getFrameRecommendation(), MAV_CMD_NAV_WAYPOINT);
                     WPM->addWaypointEditable(wp);
                 }
             }
@@ -327,17 +334,21 @@ void WaypointList::addEditable(bool onCurrentPosition)
                 updateStatusLabel(tr("WARNING: No position known. Adding default LOCAL (NED) waypoint"));
                 wp = new Waypoint(0, UASManager::instance()->getHomeLatitude(),
                                   UASManager::instance()->getHomeLongitude(),
-                                  WPM->getAltitudeRecommendation(), 0, WPM->getAcceptanceRadiusRecommendation(), 0, 0,true, true, (MAV_FRAME)WPM->getFrameRecommendation(), MAV_CMD_NAV_WAYPOINT);
+                                  WPM->getAltitudeRecommendation((MAV_FRAME)WPM->getFrameRecommendation()),
+                                  0, WPM->getAcceptanceRadiusRecommendation(), 0, 0,true, true,
+                                  (MAV_FRAME)WPM->getFrameRecommendation(), MAV_CMD_NAV_WAYPOINT);
                 WPM->addWaypointEditable(wp);
             }
         }
         else
         {
             //Since no UAV available, create first default waypoint.
-            updateStatusLabel(tr("No UAV connected. Adding default GLOBAL (NED) waypoint"));
+            updateStatusLabel(tr("No UAV connected. Adding default dummy HOME waypoint"));
             wp = new Waypoint(0, UASManager::instance()->getHomeLatitude(),
                               UASManager::instance()->getHomeLongitude(),
-                              WPM->getAltitudeRecommendation(), 0, WPM->getAcceptanceRadiusRecommendation(), 0, 0,true, true, (MAV_FRAME)WPM->getFrameRecommendation(), MAV_CMD_NAV_WAYPOINT);
+                              WPM->getAltitudeRecommendation((MAV_FRAME)WPM->getFrameRecommendation()),
+                              0, WPM->getAcceptanceRadiusRecommendation(), 0, 0,true, true,
+                              (MAV_FRAME)WPM->getFrameRecommendation(), MAV_CMD_NAV_WAYPOINT);
             WPM->addWaypointEditable(wp);
         }
     }
@@ -391,6 +402,9 @@ void WaypointList::currentWaypointEditableChanged(quint16 seq)
 // Update waypointViews to correctly indicate the new current waypoint
 void WaypointList::currentWaypointViewOnlyChanged(quint16 seq)
 {
+    // First update the edit list
+    currentWaypointEditableChanged(seq);
+
     const QList<Waypoint *> &waypoints = WPM->getWaypointViewOnlyList();
 
     if (seq < waypoints.count())
@@ -416,6 +430,7 @@ void WaypointList::updateWaypointEditable(int uas, Waypoint* wp)
     Q_UNUSED(uas);
     WaypointEditableView *wpv = wpEditableViews.value(wp);
     wpv->updateValues();
+    m_ui->tabWidget->setCurrentIndex(0); // XXX magic number
 }
 
 void WaypointList::updateWaypointViewOnly(int uas, Waypoint* wp)
@@ -423,6 +438,7 @@ void WaypointList::updateWaypointViewOnly(int uas, Waypoint* wp)
     Q_UNUSED(uas);
     WaypointViewOnlyView *wpv = wpViewOnlyViews.value(wp);
     wpv->updateValues();
+    m_ui->tabWidget->setCurrentIndex(1); // XXX magic number
 }
 
 void WaypointList::waypointViewOnlyListChanged()
@@ -473,6 +489,8 @@ void WaypointList::waypointViewOnlyListChanged()
     }
     this->setUpdatesEnabled(true);
     loadFileGlobalWP = false;
+
+    m_ui->tabWidget->setCurrentIndex(1);
 
 }
 
@@ -530,7 +548,6 @@ void WaypointList::waypointEditableListChanged()
     this->setUpdatesEnabled(true);
     loadFileGlobalWP = false;
 
-
 }
 
 void WaypointList::moveUp(Waypoint* wp)
@@ -545,7 +562,8 @@ void WaypointList::moveUp(Waypoint* wp)
     }
 
     // if wp was found and its not the first entry, move it
-    if (i < waypoints.count() && i > 0) {
+    // For APM the first entry is WP1
+    if (i < waypoints.count() && i > 1) {
         WPM->moveWaypoint(i, i-1);
     }
 }
@@ -556,7 +574,8 @@ void WaypointList::moveDown(Waypoint* wp)
 
     //get the current position of wp in the local storage
     int i;
-    for (i = 0; i < waypoints.count(); i++) {
+    // For APM entries start at WP1
+    for (i = 1; i < waypoints.count(); i++) {
         if (waypoints[i] == wp)
             break;
     }
@@ -569,7 +588,9 @@ void WaypointList::moveDown(Waypoint* wp)
 
 void WaypointList::removeWaypoint(Waypoint* wp)
 {    
+    if (wp && (wp->getId() > 0)){ // APM use WP0 as home so do not remove it
         WPM->removeWaypoint(wp->getId());
+    }
 }
 
 void WaypointList::changeEvent(QEvent *e)
@@ -590,8 +611,11 @@ void WaypointList::on_clearWPListButton_clicked()
     if (uas) {
         emit clearPathclicked();
         const QList<Waypoint *> &waypoints = WPM->getWaypointEditableList();
-        while(!waypoints.isEmpty()) {
-            WaypointEditableView* widget = wpEditableViews.find(waypoints[0]).value();
+
+        //Remove all but 1 waypoint, since the first is "home" on APM
+        //Also, remove from the END first, work your way back to the first
+        while (waypoints.size() > 1) {
+            WaypointEditableView *widget = wpEditableViews.find(waypoints[waypoints.size()-1]).value();
             widget->remove();
         }
     }
@@ -606,8 +630,10 @@ void WaypointList::clearWPWidget()
         // XXX delete wps as well
 
         // Clear UI elements
-        while(!waypoints.isEmpty()) {
-            WaypointEditableView* widget = wpEditableViews.find(waypoints[0]).value();
+        //Remove all but 1 waypoint, since the first is "home" on APM
+        //Also, remove from the END first, work your way back to the first
+        while(waypoints.size() > 1) {
+            WaypointEditableView* widget = wpEditableViews.find(waypoints[waypoints.size()-1]).value();
             widget->remove();
         }
 }

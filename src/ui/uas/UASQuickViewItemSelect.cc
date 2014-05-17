@@ -24,10 +24,10 @@ void UASQuickViewItemSelect::addItem(QString item,bool enabled)
 {
     QString category = ".";
     QString name = item;
-    if (item.indexOf(":") != -1 && item.indexOf(".") != -1)
+    if (item.indexOf(".") != -1)
     {
         //Item has a subcateogry
-        category = item.mid(item.indexOf(":")+1,item.indexOf(".") - item.indexOf(":")-1);
+        category = item.mid(0,item.indexOf("."));
         name = item.mid(item.indexOf(".")+1);
     }
     int col = -1;
@@ -48,7 +48,17 @@ void UASQuickViewItemSelect::addItem(QString item,bool enabled)
         titlelabel->show();
         //ui.gridLayout->addWidget(titlelabel,0,col);
         ui.stackedWidget->widget(col)->layout()->addWidget(titlelabel);
-        ui.listWidget->addItem(category);
+
+        //Ensure that GCS Status gets the top slot
+        if (category == "GCS Status")
+        {
+            ui.listWidget->insertItem(0,"----------");
+            ui.listWidget->insertItem(0,category);
+        }
+        else
+        {
+            ui.listWidget->addItem(category);
+        }
         ui.stackedWidget->widget(col)->layout()->addItem(new QSpacerItem(20, 40, QSizePolicy::Minimum, QSizePolicy::Expanding));
     }
     QCheckBox *label = new QCheckBox(this);

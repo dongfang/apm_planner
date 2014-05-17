@@ -38,9 +38,9 @@ This file is part of the APM_PLANNER project
 #include <QWidget>
 #include <QProgressDialog>
 // Using alglib for least squares calc (could migrate to Eigen Lib?)
-#include "ap.h"
-#include "optimization.h"
-#include "interpolation.h"
+#include "libs/alglib/src/ap.h"
+#include "libs/alglib/src/optimization.h"
+#include "libs/alglib/src/interpolation.h"
 
 
 class RawImuTuple{
@@ -66,6 +66,7 @@ public:
     ~CompassConfig();
 
     static void sphere_error(const alglib::real_1d_array &xi, alglib::real_1d_array &fi, void *obj);
+    void updateCompassSelection();
 
 private:
     enum CompassType {none, APM, ExternalCompass, PX4};
@@ -98,6 +99,7 @@ private:
     void cleanup();
 
 private:
+    bool m_validSensorOffsets;
     Ui::CompassConfig ui;
     QPointer<QProgressDialog> m_progressDialog;
     QPointer<QTimer> m_timer;
